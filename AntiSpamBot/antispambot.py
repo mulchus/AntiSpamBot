@@ -14,26 +14,37 @@ def start(message):
     with open('wordfilter.txt', newline='') as f:  # создание списка плохих слов из файла csv
         config.mat = f.read().split(', ')
         f.close()
-    bot.send_message(message.chat.id, f'group_id = {message.chat.id}')
+    info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+    time.sleep(3)
+    bot.delete_message(message.chat.id, message.message_id)
+    bot.delete_message(info_message.chat.id, info_message.message_id)
 
-
+# Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
 def addword(message):
     _, newword = message.text.split(maxsplit=1)
-    if newword not in str(config.mat).lower():
+    if newword not in config.mat:
         with open('wordfilter.txt', 'a') as f:
             f.write(', ' + newword)
             f.close()
             config.mat.append(newword)
-            bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово {newword}')
+            bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
     else:
-        bot.send_message(message.chat.id, f'В базе плохих слов есть слово {newword}')
+        bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
 
-@bot.message_handler(commands=['show'])  # вывод сообщений, возможных к обработке
+
+# вывод сообщений, возможных к обработке
+@bot.message_handler(commands=['show'])
 def show(message):
     # print(f'message {message}')
-    #bot.send_message(message.chat.id, f'group_id = {message}')
+    # bot.send_message(message.chat.id, f'group_id = {message.group_id}')
     print(f'message = {message}')
+    _, object = message.text.split(maxsplit=1)
+    if object == 'admins':
+        admins = bot.get_chat_administrators(message.chat.id)
+        for i in len(admins):
+            print(admins[i])
+
 
 @bot.message_handler(commands=['delete'])  # , func=lambda message: message.entities is not None and message.chat.id == message.chat.id )
 def delete(message):
@@ -70,12 +81,17 @@ def delete(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def bad_text(message):
+    mats_words = ''
     for word in message.text.split(' '):
-        supword = (''.join(c for c in word if c not in config.black_sibvols)).lower()
+        supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
         for word_from_slovar in config.mat:
-            if supword == word_from_slovar.lower():  # уменьшаем слово
-                bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал {word}!')
-
+            if supword == word_from_slovar:  # уменьшаем слово и проверяем на мат
+                mats_words += (', ' + word)
+    if mats_words != '':
+        info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words}"!')
+        time.sleep(3)
+        bot.delete_message(message.chat.id, message.message_id)
+        bot.delete_message(info_message.chat.id, info_message.message_id)
 
 
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
@@ -84,9 +100,8 @@ def bad_text(message):
 def bad_message(message):
     if message.content_type in config.bot_settings['forbidden_message']:
         info_message = bot.send_message(message.chat.id, f'Че за херня? Удаляю!')
+        time.sleep(3)
         bot.delete_message(message.chat.id, message.message_id)
-        time.sleep(2)
-        print(info_message)
         bot.delete_message(info_message.chat.id, info_message.message_id)
 
 # @bot.message_handler(func=lambda message: message.entities is not None and message.chat.id == message.chat.id)
