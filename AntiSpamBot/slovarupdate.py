@@ -2,6 +2,8 @@ import config
 
 with open('wordfilter.txt', 'r') as f:
     config.mat = f.read().split(', ')
+    for item in config.mat:
+        item.lower()
     print(config.mat[0:10])
     print(len(config.mat))
     mat = ', '.join(sorted(list(set(config.mat))))
