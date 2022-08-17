@@ -1,6 +1,6 @@
 import config
 import telebot
-import csv
+import string
 from datetime import datetime
 from datetime import time
 
@@ -9,10 +9,22 @@ bot = telebot.TeleBot(config.token)
 time_start = ''
 time_end = ''
 
+@bot.message_handler(commands=['addword'])
+def addword(message):
+    _, newword = message.text.split(maxsplit=1)
+    if newword not in str(config.mat).lower():
+        with open('wordfilter.txt', 'a') as f:
+            f.write(', ' + newword)
+            f.close()
+            config.mat.append(newword)
+            bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово {newword}')
+    else:
+        bot.send_message(message.chat.id, f'В базе плохих слов есть слово {newword}')
+
 @bot.message_handler(commands=['start'])
 def start(message):
-    with open('wordfilter.csv', newline='') as f:  # создание списка плохих слов из файла csv
-        config.mat = csv.reader(f)
+    with open('wordfilter.txt', newline='') as f:  # создание списка плохих слов из файла csv
+        config.mat = f.read().split(', ')
         f.close()
     print(config.mat[0:10])
     group_id = message.chat.id
@@ -22,9 +34,16 @@ def start(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def bad_text(message):
-    for word in message.text:
-        if word in config.mat:
-            bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал {word}!')
+    for word in message.text.split(' '):
+        #print(word)
+        supword = '' #проверка в цикле наличия в слове цифр
+        for s in word:
+            if not s.isdigit():
+                supword += s
+        for slovar_word in str(config.mat).lower():
+            if supword.lower().rstrip(string.punctuation) == slovar_word: #уменьшаем слово и исключаем знаки препинания
+                #print(supword.lower().rstrip(string.punctuation))
+                bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал {word}!')
     #print(message)
     pass
 
