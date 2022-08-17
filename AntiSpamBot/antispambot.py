@@ -76,6 +76,8 @@ def bad_text(message):
             if supword == word_from_slovar.lower():  # уменьшаем слово
                 bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал {word}!')
 
+
+
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
 # сообщения бота
 @bot.message_handler(content_types=['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'])
