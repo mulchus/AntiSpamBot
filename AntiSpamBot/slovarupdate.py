@@ -1,5 +1,5 @@
 import config
-
+#
 with open('wordfilter.txt', 'r') as f:
     config.mat = f.read().split(', ')
     for item in config.mat:
