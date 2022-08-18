@@ -8,16 +8,23 @@ bot = telebot.TeleBot(config.token)
 time_start = ''
 time_end = ''
 
+
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
-    with open('wordfilter.txt', newline='') as f:  # создание списка плохих слов из файла csv
+    with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
         config.mat = f.read().split(', ')
         f.close()
-    info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
-    time.sleep(3)
-    bot.delete_message(message.chat.id, message.message_id)
-    bot.delete_message(info_message.chat.id, info_message.message_id)
+        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+
+
+# функция удаления команды пользователя и сообщения бота через время = config.pause
+def del_bot_mes(chat_id, mes_id, info_mes_id):
+        bot.delete_message(chat_id, mes_id)
+        time.sleep(config.pause)
+        bot.delete_message(chat_id, info_mes_id)
+
 
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
@@ -28,9 +35,27 @@ def addword(message):
             f.write(', ' + newword)
             f.close()
             config.mat.append(newword)
-            bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+            info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     else:
-        bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
+        info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+
+
+# Удаление слов из БД
+@bot.message_handler(commands=['delword'])
+def delword(message):
+    _, word = message.text.split(maxsplit=1)
+    if word in config.mat:
+        with open('wordfilter.txt', 'w') as f:
+            config.mat.remove(word)
+            f.write(str(config.mat))
+            f.close()
+            info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    else:
+        info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 
 # вывод сообщений, возможных к обработке
@@ -38,12 +63,26 @@ def addword(message):
 def show(message):
     # print(f'message {message}')
     # bot.send_message(message.chat.id, f'group_id = {message.group_id}')
-    print(f'message = {message}')
-    _, object = message.text.split(maxsplit=1)
-    if object == 'admins':
+    # print(f'message = {message}')
+    try:
+        _, object = message.text.split(maxsplit=1)
+    except ValueError:
+        info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    else:
         admins = bot.get_chat_administrators(message.chat.id)
-        for i in len(admins):
-            print(admins[i])
+        admins_id = []
+        for i in range(len(admins)):  # формируем список ID админов чата из списка инфо об админах
+            admins_id.append(admins[i].user.id)
+        if message.from_user.id not in admins_id: # если команду дал не админ - отлуп
+            info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        elif object == 'admins': # если команда "/show admins", то вывод админов:
+            list_admins = ''
+            for i in range(len(admins)):
+                list_admins += (f'Админ №{i+1}: {admins[i].user.username}, бот? {admins[i].user.is_bot}\n')
+            info_message = bot.send_message(message.chat.id, list_admins)
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 
 @bot.message_handler(commands=['delete'])  # , func=lambda message: message.entities is not None and message.chat.id == message.chat.id )
@@ -85,13 +124,11 @@ def bad_text(message):
     for word in message.text.split(' '):
         supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
         for word_from_slovar in config.mat:
-            if supword == word_from_slovar:  # уменьшаем слово и проверяем на мат
-                mats_words += (', ' + word)
+            if supword == word_from_slovar:  # упроверяем на мат
+                mats_words += (word + ', ')
     if mats_words != '':
-        info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words}"!')
-        time.sleep(3)
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.delete_message(info_message.chat.id, info_message.message_id)
+        info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words[:-2]}"!')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
@@ -99,10 +136,10 @@ def bad_text(message):
 @bot.message_handler(content_types=['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'])
 def bad_message(message):
     if message.content_type in config.bot_settings['forbidden_message']:
-        info_message = bot.send_message(message.chat.id, f'Че за херня? Удаляю!')
-        time.sleep(3)
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.delete_message(info_message.chat.id, info_message.message_id)
+        info_message = bot.send_message(message.chat.id, f'Размещение формата \b{message.content_type}\b запрещено! Удаляю!')
+
+
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 # @bot.message_handler(func=lambda message: message.entities is not None and message.chat.id == message.chat.id)
 # def delete_links(message):
