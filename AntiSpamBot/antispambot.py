@@ -18,7 +18,7 @@ def start(message):
         info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
-
+#
 # функция удаления команды пользователя и сообщения бота через время = config.pause
 def del_bot_mes(chat_id, mes_id, info_mes_id):
         bot.delete_message(chat_id, mes_id)
