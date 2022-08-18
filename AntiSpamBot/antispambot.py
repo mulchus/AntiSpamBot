@@ -49,7 +49,7 @@ def delword(message):
     if word in config.mat:
         with open('wordfilter.txt', 'w') as f:
             config.mat.remove(word)
-            f.write(str(config.mat))
+            f.write(', '.join(config.mat))
             f.close()
             info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
