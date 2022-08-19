@@ -1,7 +1,9 @@
 import config
 import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 import time
+
 
 bot = telebot.TeleBot(config.token)
 
@@ -9,14 +11,26 @@ time_start = ''
 time_end = ''
 
 
+
+# кнопка СТАРТ
+#button_start = KeyboardButton('СТАРТ!')
+#greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
+
+
+
 # запуск бота для инициализации стартовых процессов:
-@bot.message_handler(commands=['start'])
-def start(message):
+@bot.message_handler(func=lambda message: True)
+# @bot.message_handler(commands=['start'])
+    def start(message):
+    bot.send_message(message.chat.id, "СТАРТ!", reply_markup=gen_markup())
     with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
         config.mat = f.read().split(', ')
         f.close()
-        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+        # info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+
+
 
 #
 # функция удаления команды пользователя и сообщения бота через время = config.pause
