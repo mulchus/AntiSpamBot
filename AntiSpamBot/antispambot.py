@@ -1,37 +1,48 @@
 import config
 import telebot
-# from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 import time
 import markups as m
-
 
 bot = telebot.TeleBot(config.token)
 
 time_start = ''
 time_end = ''
 
-
-
 # кнопка СТАРТ
 #button_start = KeyboardButton('СТАРТ!')
 #greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
 
-
-
 # запуск бота для инициализации стартовых процессов:
 # @bot.message_handler(func=lambda message: True)
 @bot.message_handler(commands=['start'])
-def start_handler(message):
-    bot.send_message(message.chat.id, f"СТАРТУЮ в чате № {message.chat.id}!", reply_markup=m.start_markup)
+def start(message):
+    inline_message = bot.send_message(message.chat.id, f"Стартую в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
         config.mat = f.read().split(', ')
         f.close()
-        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!') # , reply_markup=m.end_markup
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
-    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
-
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+   try:
+       if call.message:
+           if call.data == "start":
+               bot.send_message(call.message.chat.id, "СТАРТ!")
+           if call.data == "del":
+               # bot.send_message(call.message.chat.id, "DEL")
+               bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                             reply_markup='')  # удаляем кнопки у последнего сообщения
+       elif call.inline_message_id:
+           if call.data == "start":
+               bot.send_message(call.message.chat.id, "СТАРТ111!")
+           if call.data == "del":
+               bot.send_message(call.message.chat.id, "DEL111")
+   except Exception as e:
+       print(repr(e))
 
 #
 # функция удаления команды пользователя и сообщения бота через время = config.pause
@@ -39,7 +50,6 @@ def del_bot_mes(chat_id, mes_id, info_mes_id):
         bot.delete_message(chat_id, mes_id)
         time.sleep(config.pause)
         bot.delete_message(chat_id, info_mes_id)
-
 
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
