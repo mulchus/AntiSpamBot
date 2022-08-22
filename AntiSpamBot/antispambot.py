@@ -1,8 +1,9 @@
 import config
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+# from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 import time
+import markups as m
 
 
 bot = telebot.TeleBot(config.token)
@@ -19,16 +20,16 @@ time_end = ''
 
 
 # запуск бота для инициализации стартовых процессов:
-@bot.message_handler(func=lambda message: True)
-# @bot.message_handler(commands=['start'])
-    def start(message):
-    bot.send_message(message.chat.id, "СТАРТ!", reply_markup=gen_markup())
+# @bot.message_handler(func=lambda message: True)
+@bot.message_handler(commands=['start'])
+def start_handler(message):
+    bot.send_message(message.chat.id, f"СТАРТУЮ в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
         config.mat = f.read().split(', ')
         f.close()
-        # info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
+        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')
 
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 
 
