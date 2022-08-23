@@ -7,6 +7,9 @@ import markups as m
 
 bot = telebot.TeleBot(config.token)
 
+previous_markup = None
+previous_message = None
+# info_message = None
 time_start = ''
 time_end = ''
 
@@ -19,72 +22,128 @@ time_end = ''
 @bot.message_handler(commands=['start'])
 def start(message):
     inline_message = bot.send_message(message.chat.id, f"Стартую в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
-        config.mat = f.read().split(', ')
-        f.close()
-        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!') # , reply_markup=m.end_markup
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    if not config.mat:
+        with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
+            config.mat = f.read().split(', ')
+            f.close()
+            info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!') # , reply_markup=m.end_markup
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            # del_bot_mes(inline_message.chat.id, inline_message.message_id, 0)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-   try:
-       if call.message:
-           if call.data == "menu":
-               bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
-           if call.data == "help":
-               print(config.help)
-               # bot.send_message(call.message.chat.id, "DEL")
-               (config.bot_settings['forbidden_message']).remove('audio')
-               print(config.bot_settings['forbidden_message'])
-               bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
-                                             reply_markup='')  # удаляем кнопки у последнего сообщения
-       elif call.inline_message_id:
-           if call.data == "start":
-               bot.send_message(call.message.chat.id, "СТАРТ111!")
-           if call.data == "del":
-               bot.send_message(call.message.chat.id, "DEL111")
-   except Exception as e:
-       print(repr(e))
+    global previous_markup
+    global previous_message
+    # global info_message
+    # try:
+    if call.message:
+        if call.data == "menu":
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
+            bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
+            previous_markup = 'start_markup'
+            previous_message = 0
+        if call.data == "help":
+            # print(config.help)
+            # bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+            #                              reply_markup='')  # удаляем кнопки у последнего сообщения
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
+            previous_markup = 'start_markup'
+            previous_message = (bot.send_message(call.message.chat.id, config.help)).message_id
+            bot.send_message(call.message.chat.id, "Помощь", reply_markup=m.exit_markup)
+        if call.data == "forbidden_message":
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0) # и все последнее сообщение
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
+        if call.data == "bad_words":
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и все последнее сообщение
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
+        # print(config.all_types_message)
+        if call.data in config.all_types_message:
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            if call.data in config.bot_settings['forbidden_message']:
+                (config.bot_settings['forbidden_message']).remove(call.data)
+                mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
+                time.sleep(config.pause)
+                del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+            else:
+                (config.bot_settings['forbidden_message']).append(call.data)
+                mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
+                time.sleep(config.pause)
+                del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+        # print(config.all_types_message)
+
+
+        if call.data == "exit":
+            # print(call.message.message_id)
+            # bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+            #                               reply_markup='')  # удаляем кнопки у последнего сообщения
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            if previous_message:
+                bot.delete_message(call.message.chat.id, previous_message)
+            if previous_markup == 'start_markup':
+                bot.send_message(call.message.chat.id, f"Стартую в чате № {call.message.chat.id}!",
+                                 reply_markup=m.start_markup)
+                previous_markup = ''
+            elif previous_markup == 'menu_markup':
+                bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
+                previous_markup = 'start_markup'
+            elif previous_markup == 'forbidden_message_markup':
+                bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
+                previous_markup = 'menu_markup'
+            elif previous_markup == 'bad_words':
+                bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
+                previous_markup = 'menu_markup'
+    # except Exception as e:
+    #     print(repr(e))
 
 #
 # функция удаления команды пользователя и сообщения бота через время = config.pause
 def del_bot_mes(chat_id, mes_id, info_mes_id):
         bot.delete_message(chat_id, mes_id)
-        time.sleep(config.pause)
-        bot.delete_message(chat_id, info_mes_id)
+        if info_mes_id:
+            time.sleep(config.pause)
+            bot.delete_message(chat_id, info_mes_id)
 
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
 def addword(message):
-    _, newword = message.text.split(maxsplit=1)
-    if newword not in config.mat:
-        with open('wordfilter.txt', 'a') as f:
-            f.write(', ' + newword)
-            f.close()
-            config.mat.append(newword)
-            info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+    try:
+        _, newword = message.text.split(maxsplit=1)
+        if newword not in config.mat:
+            with open('wordfilter.txt', 'a') as f:
+                f.write(', ' + newword)
+                f.close()
+                config.mat.append(newword)
+                info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+                del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        else:
+            info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    else:
-        info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-
+    except Exception as e:
+        print(repr(e))
 
 # Удаление слов из БД
 @bot.message_handler(commands=['delword'])
 def delword(message):
-    _, word = message.text.split(maxsplit=1)
-    if word in config.mat:
-        with open('wordfilter.txt', 'w') as f:
-            config.mat.remove(word)
-            f.write(', '.join(config.mat))
-            f.close()
-            info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+    try:
+        _, word = message.text.split(maxsplit=1)
+        if word in config.mat:
+            with open('wordfilter.txt', 'w') as f:
+                config.mat.remove(word)
+                f.write(', '.join(config.mat))
+                f.close()
+                info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+                del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        else:
+            info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    else:
-        info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-
+    except Exception as e:
+        print(repr(e))
 
 # вывод сообщений, возможных к обработке
 @bot.message_handler(commands=['show'])
@@ -148,26 +207,29 @@ def delete(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def bad_text(message):
-    mats_words = ''
-    for word in message.text.split(' '):
-        supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
-        for word_from_slovar in config.mat:
-            if supword == word_from_slovar:  # упроверяем на мат
-                mats_words += (word + ', ')
-    if mats_words != '':
-        info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words[:-2]}"!')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-
+    try:
+        mats_words = ''
+        for word in message.text.split(' '):
+            supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
+            for word_from_slovar in config.mat:
+                if supword == word_from_slovar:  # упроверяем на мат
+                    mats_words += (word + ', ')
+        if mats_words != '':
+            info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words[:-2]}"!')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    except Exception as e:
+        print(repr(e))
 
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
 # сообщения бота
 @bot.message_handler(content_types=['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'])
 def bad_message(message):
-    if message.content_type in config.bot_settings['forbidden_message']:
-        info_message = bot.send_message(message.chat.id, f'Размещение формата \b{message.content_type}\b запрещено! Удаляю!')
-
-
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    try:
+        if message.content_type in config.bot_settings['forbidden_message']:
+            info_message = bot.send_message(message.chat.id, f'Размещение формата \b{message.content_type}\b запрещено! Удаляю!')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    except Exception as e:
+        print(repr(e))
 
 # @bot.message_handler(func=lambda message: message.entities is not None and message.chat.id == message.chat.id)
 # def delete_links(message):
