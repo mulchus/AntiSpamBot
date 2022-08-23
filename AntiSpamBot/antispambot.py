@@ -30,10 +30,13 @@ def start(message):
 def callback_inline(call):
    try:
        if call.message:
-           if call.data == "start":
-               bot.send_message(call.message.chat.id, "СТАРТ!")
-           if call.data == "del":
+           if call.data == "menu":
+               bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
+           if call.data == "help":
+               print(config.help)
                # bot.send_message(call.message.chat.id, "DEL")
+               (config.bot_settings['forbidden_message']).remove('audio')
+               print(config.bot_settings['forbidden_message'])
                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
                                              reply_markup='')  # удаляем кнопки у последнего сообщения
        elif call.inline_message_id:
