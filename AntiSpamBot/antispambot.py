@@ -4,6 +4,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 import time
 import markups as m
+import json
 
 bot = telebot.TeleBot(config.token)
 
@@ -22,13 +23,33 @@ time_end = ''
 @bot.message_handler(commands=['start'])
 def start(message):
     inline_message = bot.send_message(message.chat.id, f"Стартую в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    if not config.mat:
+    with open('bot_settings.json', 'r+') as f:
+        config.bot_settings = json.load(f)
+    new_chat = 0    # проверяем наличие чата в списке конфиг и
+    for chat_settings in config.bot_settings:
+        if message.chat.id in chat_settings.values():
+            # print('Я знаю этот чат!')
+            new_chat = 1
+    if not new_chat: # если знакомый чат не найден - добавляем текущий чат в список конфига
+            chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.all_types_message}
+            config.bot_settings.append(chat_settings)
+            bot_settings_save(config.bot_settings)
+    if not config.mat: # если словарь мата еще пустой
         with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
             config.mat = f.read().split(', ')
             f.close()
-            info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!') # , reply_markup=m.end_markup
+            info_message = bot.send_message(message.chat.id, f'Словарь мата загружен') # , reply_markup=m.end_markup
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-            # del_bot_mes(inline_message.chat.id, inline_message.message_id, 0)
+            # time.sleep(config.pause)
+            # time.sleep(config.pause)
+    info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
+    del_bot_mes(message.chat.id, info_message.message_id, 0)
+
+def bot_settings_save(bot_settings):    # сохранение списка настроек разных чатов в файл
+    f = open('bot_settings.json', 'w+')
+    f.seek(0)
+    f.write(json.dumps(bot_settings))
+    f.close()
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -65,16 +86,20 @@ def callback_inline(call):
         if call.data in config.all_types_message:
             previous_markup = 'menu_markup'
             previous_message = 0
-            if call.data in config.bot_settings['forbidden_message']:
-                (config.bot_settings['forbidden_message']).remove(call.data)
-                mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
-                time.sleep(config.pause)
-                del_bot_mes(call.message.chat.id, mes1.message_id, 0)
-            else:
-                (config.bot_settings['forbidden_message']).append(call.data)
-                mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
-                time.sleep(config.pause)
-                del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+            for chat_settings in config.bot_settings:
+                if call.message.chat.id in chat_settings.values():
+                    if call.data in chat_settings['forbidden_message']:
+                        (chat_settings['forbidden_message']).remove(call.data)
+                        mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
+                        time.sleep(config.pause)
+                        del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+                        bot_settings_save(config.bot_settings)
+                    else:
+                        (chat_settings['forbidden_message']).append(call.data)
+                        mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
+                        time.sleep(config.pause)
+                        del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+                        bot_settings_save(config.bot_settings)
         # print(config.all_types_message)
 
 
@@ -104,6 +129,7 @@ def callback_inline(call):
 #
 # функция удаления команды пользователя и сообщения бота через время = config.pause
 def del_bot_mes(chat_id, mes_id, info_mes_id):
+        time.sleep(config.pause)
         bot.delete_message(chat_id, mes_id)
         if info_mes_id:
             time.sleep(config.pause)
@@ -225,9 +251,11 @@ def bad_text(message):
 @bot.message_handler(content_types=['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'])
 def bad_message(message):
     try:
-        if message.content_type in config.bot_settings['forbidden_message']:
-            info_message = bot.send_message(message.chat.id, f'Размещение формата \b{message.content_type}\b запрещено! Удаляю!')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        for chat_settings in config.bot_settings:
+            if message.chat.id in chat_settings.values():
+                if message.content_type in chat_settings['forbidden_message']:
+                    info_message = bot.send_message(message.chat.id, f'Размещение формата \b{message.content_type}\b запрещено! Удаляю!')
+                    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         print(repr(e))
 
