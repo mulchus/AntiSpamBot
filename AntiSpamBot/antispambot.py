@@ -248,8 +248,10 @@ def bad_text(message):
 
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
 # сообщения бота
-@bot.message_handler(content_types=['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'])
+
+@bot.message_handler(content_types=config.all_types_message)
 def bad_message(message):
+    print(message)
     try:
         for chat_settings in config.bot_settings:
             if message.chat.id in chat_settings.values():
