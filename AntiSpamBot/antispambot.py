@@ -19,10 +19,9 @@ time_end = ''
 #greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
 
 # запуск бота для инициализации стартовых процессов:
-# @bot.message_handler(func=lambda message: True)
 @bot.message_handler(commands=['start'])
 def start(message):
-    inline_message = bot.send_message(message.chat.id, f"Стартую в чате № {message.chat.id}!", reply_markup=m.start_markup)
+    inline_message = bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('bot_settings.json', 'r+') as f:
         config.bot_settings = json.load(f)
     new_chat = 0    # проверяем наличие чата в списке конфиг и
@@ -45,12 +44,17 @@ def start(message):
     info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
     del_bot_mes(message.chat.id, info_message.message_id, 0)
 
+# вызов меню:
+@bot.message_handler(commands=['menu'])
+def menu(message):
+    if config.mat: # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
+        bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+
 def bot_settings_save(bot_settings):    # сохранение списка настроек разных чатов в файл
     f = open('bot_settings.json', 'w+')
     f.seek(0)
     f.write(json.dumps(bot_settings))
     f.close()
-
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -73,12 +77,14 @@ def callback_inline(call):
             previous_message = (bot.send_message(call.message.chat.id, config.help)).message_id
             bot.send_message(call.message.chat.id, "Помощь", reply_markup=m.exit_markup)
         if call.data == "forbidden_message":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0) # и все последнее сообщение
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0) # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
-            bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
+            for bot_settings in config.bot_settings:
+                if bot_settings["chat_id"] == call.message.chat.id:
+                    bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {bot_settings["forbidden_message"]}', reply_markup=m.forbidden_message_markup)
         if call.data == "bad_words":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и все последнее сообщение
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
             bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
@@ -111,7 +117,7 @@ def callback_inline(call):
             if previous_message:
                 bot.delete_message(call.message.chat.id, previous_message)
             if previous_markup == 'start_markup':
-                bot.send_message(call.message.chat.id, f"Стартую в чате № {call.message.chat.id}!",
+                bot.send_message(call.message.chat.id, f"Меню в чате № {call.message.chat.id}!",
                                  reply_markup=m.start_markup)
                 previous_markup = ''
             elif previous_markup == 'menu_markup':
@@ -193,7 +199,7 @@ def show(message):
         elif object == 'admins': # если команда "/show admins", то вывод админов:
             list_admins = ''
             for i in range(len(admins)):
-                list_admins += (f'Админ №{i+1}: {admins[i].user.username}, бот? {admins[i].user.is_bot}\n')
+                list_admins += (f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n')
             info_message = bot.send_message(message.chat.id, list_admins)
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
@@ -251,7 +257,7 @@ def bad_text(message):
 
 @bot.message_handler(content_types=config.all_types_message)
 def bad_message(message):
-    print(message)
+    # print(message)
     try:
         for chat_settings in config.bot_settings:
             if message.chat.id in chat_settings.values():
