@@ -24,10 +24,12 @@ forbidden_message_markup_sticker = types.InlineKeyboardButton('Стикер', ca
 forbidden_message_markup_video = types.InlineKeyboardButton('Видео', callback_data='video')
 forbidden_message_markup_video_note = types.InlineKeyboardButton('Видеосообщение', callback_data='video_note')
 forbidden_message_markup_voice = types.InlineKeyboardButton('Голос', callback_data='voice')
+forbidden_message_markup_document = types.InlineKeyboardButton('Документ', callback_data='document')
+forbidden_message_markup_animation = types.InlineKeyboardButton('Анимация(GIF)', callback_data='animation')
 forbidden_message_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
 forbidden_message_markup.add(forbidden_message_markup_audio, forbidden_message_markup_photo, forbidden_message_markup_sticker,
-                forbidden_message_markup_video, forbidden_message_markup_video_note, forbidden_message_markup_voice,
-                forbidden_message_markup_exit)
+                forbidden_message_markup_video, forbidden_message_markup_video_note, forbidden_message_markup_voice, forbidden_message_markup_document,
+                forbidden_message_markup_animation, forbidden_message_markup_exit)
 
 bad_words_markup = types.InlineKeyboardMarkup(row_width=2)
 bad_words_markup_add = types.InlineKeyboardButton('Добавить', callback_data='bad_words_add')
