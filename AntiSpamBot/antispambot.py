@@ -88,7 +88,17 @@ def callback_inline(call):
             previous_markup = 'menu_markup'
             previous_message = 0
             bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
-        # print(config.all_types_message)
+        if call.data == "bad_words_add":
+            # del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
+            # previous_markup = 'menu_markup'
+            # previous_message = 0
+            mess = bot.send_message(call.message.chat.id, "Какое слово добавить?")
+            config.command_from_markup = 'addword'
+            bot.register_next_step_handler(mess, addword(bot.message_handler(content_types=['text'])))
+            # if call.message.text == 'ля':
+            #     bot.send_message(call.message.chat.id, 'Верный ответ!')
+
+
         if call.data in config.all_types_message:
             previous_markup = 'menu_markup'
             previous_message = 0
@@ -129,6 +139,7 @@ def callback_inline(call):
             elif previous_markup == 'bad_words':
                 bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
                 previous_markup = 'menu_markup'
+
     # except Exception as e:
     #     print(repr(e))
 
@@ -144,6 +155,9 @@ def del_bot_mes(chat_id, mes_id, info_mes_id):
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
 def addword(message):
+    if config.command_from_markup:
+        message = bot.message_handler(content_types=['text'])
+        message.text = 'addword ' + message.text
     try:
         _, newword = message.text.split(maxsplit=1)
         if newword not in config.mat:
@@ -158,6 +172,8 @@ def addword(message):
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         print(repr(e))
+    if config.command_from_markup:
+        config.command_from_markup = None
 
 # Удаление слов из БД
 @bot.message_handler(commands=['delword'])
@@ -203,6 +219,26 @@ def show(message):
             info_message = bot.send_message(message.chat.id, list_admins)
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
+@bot.message_handler(commands=['pause'])
+def pause(message):
+    try:
+        _, sec = message.text.split(maxsplit=1)
+    except ValueError:
+        info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
+        del_bot_mes(message.chat.id, info_message.message_id, 0)
+    else:
+        if sec.isdigit():
+            config.pause = int(sec)
+            info_message = bot.send_message(message.chat.id, f'Пауза отображения сообщения бота теперь = {sec} секунд')
+            del_bot_mes(message.chat.id, info_message.message_id, 0)
+        else:
+            info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
+            del_bot_mes(message.chat.id, info_message.message_id, 0)
+
+@bot.message_handler(commands=['help'])
+def help(message):
+    bot.send_message(message.chat.id, config.help)
+
 
 @bot.message_handler(commands=['delete'])  # , func=lambda message: message.entities is not None and message.chat.id == message.chat.id )
 def delete(message):
@@ -244,7 +280,7 @@ def bad_text(message):
         for word in message.text.split(' '):
             supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
             for word_from_slovar in config.mat:
-                if supword == word_from_slovar:  # упроверяем на мат
+                if supword == word_from_slovar:  # проверяем на мат
                     mats_words += (word + ', ')
         if mats_words != '':
             info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words[:-2]}"!')
