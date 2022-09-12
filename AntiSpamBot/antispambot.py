@@ -21,28 +21,32 @@ time_end = ''
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
-    inline_message = bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    with open('bot_settings.json', 'r+') as f:
-        config.bot_settings = json.load(f)
-    new_chat = 0    # проверяем наличие чата в списке конфиг и
-    for chat_settings in config.bot_settings:
-        if message.chat.id in chat_settings.values():
-            # print('Я знаю этот чат!')
-            new_chat = 1
-    if not new_chat: # если знакомый чат не найден - добавляем текущий чат в список конфига
-            chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.all_types_message}
-            config.bot_settings.append(chat_settings)
-            bot_settings_save(config.bot_settings)
-    if not config.mat: # если словарь мата еще пустой
-        with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
-            config.mat = f.read().split(', ')
-            f.close()
-            info_message = bot.send_message(message.chat.id, f'Словарь мата загружен') # , reply_markup=m.end_markup
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-            # time.sleep(config.pause)
-            # time.sleep(config.pause)
-    info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
-    del_bot_mes(message.chat.id, info_message.message_id, 0)
+    if not config.mat:
+        inline_message = bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+        with open('bot_settings.json', 'r+') as f:
+            config.bot_settings = json.load(f)
+        new_chat = 0    # проверяем наличие чата в списке конфиг и
+        for chat_settings in config.bot_settings:
+            if message.chat.id in chat_settings.values():
+                # print('Я знаю этот чат!')
+                new_chat = 1
+        if not new_chat: # если знакомый чат не найден - добавляем текущий чат в список конфига
+                chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.all_types_message}
+                config.bot_settings.append(chat_settings)
+                bot_settings_save(config.bot_settings)
+        if not config.mat: # если словарь мата еще пустой
+            with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
+                config.mat = f.read().split(', ')
+                f.close()
+                info_message = bot.send_message(message.chat.id, f'Словарь мата загружен') # , reply_markup=m.end_markup
+                del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+                # time.sleep(config.pause)
+                # time.sleep(config.pause)
+        info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
+        del_bot_mes(message.chat.id, info_message.message_id, 0)
+    else:
+        info_message = bot.send_message(message.chat.id, f'Шеф. я уже запущен! Не кипишуй')  # , reply_markup=m.end_markup
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 # вызов меню:
 @bot.message_handler(commands=['menu'])
@@ -89,14 +93,16 @@ def callback_inline(call):
             previous_message = 0
             bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
         if call.data == "bad_words_add":
-            # del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
-            # previous_markup = 'menu_markup'
-            # previous_message = 0
             mess = bot.send_message(call.message.chat.id, "Какое слово добавить?")
             config.command_from_markup = 'addword'
-            bot.register_next_step_handler(mess, addword(bot.message_handler(content_types=['text'])))
-            # if call.message.text == 'ля':
-            #     bot.send_message(call.message.chat.id, 'Верный ответ!')
+            config.message_id[call.message.chat.id] = mess.message_id
+            bot.register_next_step_handler(mess, addword)
+        if call.data == "bad_words_del":
+            mess = bot.send_message(call.message.chat.id, "Какое слово удалить?")
+            config.command_from_markup = 'delword'
+            config.message_id[call.message.chat.id] = mess.message_id
+            bot.register_next_step_handler(mess, delword)
+
 
 
         if call.data in config.all_types_message:
@@ -152,46 +158,64 @@ def del_bot_mes(chat_id, mes_id, info_mes_id):
             time.sleep(config.pause)
             bot.delete_message(chat_id, info_mes_id)
 
+def bot_start_check(message): # проверка стартовал ли ранее бот
+    if not config.mat:
+        del_bot_mes(message.chat.id, config.message_id[message.chat.id], 0)
+        info_message = bot.send_message(message.chat.id, f'Сначала надо запустить бота и сформировать словарь \n/start')
+        time.sleep(config.pause)
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        return False
+    else:
+        return True
+
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
 def addword(message):
-    if config.command_from_markup:
-        message = bot.message_handler(content_types=['text'])
-        message.text = 'addword ' + message.text
-    try:
-        _, newword = message.text.split(maxsplit=1)
-        if newword not in config.mat:
-            with open('wordfilter.txt', 'a') as f:
-                f.write(', ' + newword)
-                f.close()
-                config.mat.append(newword)
-                info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+    if bot_start_check(message): # проверка стартовал ли ранее бот
+        if config.command_from_markup: # проверка на тип команды - из кнопки или из текста
+            del_bot_mes(message.chat.id, config.message_id[message.chat.id], 0)
+            message.text = 'addword ' + message.text
+        try:
+            _, newword = message.text.split(maxsplit=1)
+            if newword not in config.mat:
+                with open('wordfilter.txt', 'a') as f:
+                    f.write(', ' + newword)
+                    f.close()
+                    config.mat.append(newword)
+                    info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+                    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            else:
+                info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
                 del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-        else:
-            info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    except Exception as e:
-        print(repr(e))
-    if config.command_from_markup:
-        config.command_from_markup = None
+        except Exception as e:
+            print(repr(e))
+        if config.command_from_markup:
+            config.command_from_markup = None
 
 # Удаление слов из БД
 @bot.message_handler(commands=['delword'])
 def delword(message):
-    try:
-        _, word = message.text.split(maxsplit=1)
-        if word in config.mat:
-            with open('wordfilter.txt', 'w') as f:
-                config.mat.remove(word)
-                f.write(', '.join(config.mat))
-                f.close()
-                info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+    if bot_start_check(message):  # проверка стартовал ли ранее бот
+        if config.command_from_markup: # проверка на тип команды - из кнопки или из текста
+            del_bot_mes(message.chat.id, config.message_id[message.chat.id], 0)
+            # message = bot.message_handler(content_types=['text'])
+            message.text = 'delword ' + message.text
+        try:
+            _, word = message.text.split(maxsplit=1)
+            if word in config.mat:
+                with open('wordfilter.txt', 'w') as f:
+                    config.mat.remove(word)
+                    f.write(', '.join(config.mat))
+                    f.close()
+                    info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+                    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            else:
+                info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
                 del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-        else:
-            info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    except Exception as e:
-        print(repr(e))
+        except Exception as e:
+            print(repr(e))
+        if config.command_from_markup:
+            config.command_from_markup = None
 
 # вывод сообщений, возможных к обработке
 @bot.message_handler(commands=['show'])
@@ -205,19 +229,20 @@ def show(message):
         info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     else:
-        admins = bot.get_chat_administrators(message.chat.id)
-        admins_id = []
-        for i in range(len(admins)):  # формируем список ID админов чата из списка инфо об админах
-            admins_id.append(admins[i].user.id)
-        if message.from_user.id not in admins_id: # если команду дал не админ - отлуп
-            info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-        elif object == 'admins': # если команда "/show admins", то вывод админов:
-            list_admins = ''
-            for i in range(len(admins)):
-                list_admins += (f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n')
-            info_message = bot.send_message(message.chat.id, list_admins)
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        if object == 'admins':
+            admins = bot.get_chat_administrators(message.chat.id)
+            admins_id = []
+            for i in range(len(admins)):  # формируем список ID админов чата из списка инфо об админах
+                admins_id.append(admins[i].user.id)
+            if message.from_user.id not in admins_id: # если команду дал не админ - отлуп
+                info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
+                del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            elif object == 'admins': # если команда "/show admins", то вывод админов:
+                list_admins = ''
+                for i in range(len(admins)):
+                    list_admins += (f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n')
+                info_message = bot.send_message(message.chat.id, list_admins)
+                del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 @bot.message_handler(commands=['pause'])
 def pause(message):
@@ -225,7 +250,7 @@ def pause(message):
         _, sec = message.text.split(maxsplit=1)
     except ValueError:
         info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
-        del_bot_mes(message.chat.id, info_message.message_id, 0)
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     else:
         if sec.isdigit():
             config.pause = int(sec)
