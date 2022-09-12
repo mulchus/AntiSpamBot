@@ -8,12 +8,13 @@ all_types_message = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice'
 bot_settings = []
 # bot_settings['forbidden_message'] = all_types_message # не идет - изменяется и переменная и словарь одновременно
 #bot_settings['forbidden_message'] = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice']
-pause = 3
+pause = 1
+command_from_markup = []
 
-help = '''Бот супербот имеет следующие команды: \n
-        /start - запуск на сервере после сбоя бота \n
-        /menu - вывод меню \n
-        /addword слово - добавить слово в базу мата \n
-        /delword слово - удлить слово из базы мата \n
-        /show admins - вывести список админов чата \n
-        /pause число - изменить паузу отображения замечания'''
+help = '''Бот супербот имеет следующие команды: 
+        /start - запуск на сервере после сбоя бота 
+        /menu - вывод меню 
+        /addword слово - добавить слово в базу мата 
+        /delword слово - удлить слово из базы мата 
+        /show admins - вывести список админов чата 
+        /pause число (в секундах) - изменить паузу отображения замечания'''
