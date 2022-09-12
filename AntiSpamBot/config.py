@@ -10,6 +10,7 @@ bot_settings = []
 #bot_settings['forbidden_message'] = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice']
 pause = 1
 command_from_markup = []
+message_id = {}
 
 help = '''Бот супербот имеет следующие команды: 
         /start - запуск на сервере после сбоя бота 
