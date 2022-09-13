@@ -1,1 +1,1 @@
-[{"chat_id": -1001585203348, "forbidden_message": ["audio", "photo", "sticker", "video", "video_note", "voice", "animation"]}, {"chat_id": 387452657, "forbidden_message": ["voice", "animation", "photo"]}]
+[{"chat_id": -1001585203348, "forbidden_message": ["sticker", "video_note", "voice", "animation", "audio"]}, {"chat_id": 387452657, "forbidden_message": ["voice", "animation", "photo"]}]
