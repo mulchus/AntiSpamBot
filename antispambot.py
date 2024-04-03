@@ -7,6 +7,7 @@ import json
 from environs import Env
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from telebot.apihelper import ApiTelegramException
+from telebot.util import update_types
 from datetime import datetime
 
 
@@ -39,7 +40,7 @@ def start(message):
             # print('Я знаю этот чат!')
             new_chat = 1
     if not new_chat:  # если знакомый чат не найден - добавляем текущий чат в список конфига
-        chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.all_types_message}
+        chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.allowed_types_message}
         config.bot_settings.append(chat_settings)
         bot_settings_save(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
@@ -111,7 +112,7 @@ def callback_inline(call):
             # if call.message.text == 'ля':
             #     bot.send_message(call.message.chat.id, 'Верный ответ!')
 
-        if call.data in config.all_types_message:
+        if call.data in config.allowed_types_message:
             previous_markup = 'menu_markup'
             previous_message = 0
             for chat_settings in config.bot_settings:
@@ -128,7 +129,7 @@ def callback_inline(call):
                         time.sleep(config.pause)
                         del_bot_mes(call.message.chat.id, mes1.message_id, 0)
                         bot_settings_save(config.bot_settings)
-        # print(config.all_types_message)
+        # print(config.allowed_types_message)
 
         if call.data == "exit":
             # print(call.message.message_id)
@@ -222,7 +223,8 @@ def show(message):
     try:
         admins = bot.get_chat_administrators(message.chat.id)
     except ApiTelegramException:
-        info_message = bot.send_message(message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
+        info_message = bot.send_message(
+            message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
         return
     admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
@@ -297,6 +299,7 @@ def delete(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def bad_text(message):
+    
     try:
         mats_words = ''
         for word in message.text.split(' '):
@@ -314,9 +317,10 @@ def bad_text(message):
 # сообщения бота
 
 
-@bot.message_handler(content_types=config.all_types_message)
+@bot.message_handler(content_types=config.allowed_types_message)
 def bad_message(message):
-    # print(message)
+    print(message.chat.id)
+    print(message.content_type)
     try:
         for chat_settings in config.bot_settings:
             if message.chat.id in chat_settings.values():
@@ -326,6 +330,20 @@ def bad_message(message):
                     del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         print(repr(e))
+
+
+@bot.chat_member_handler()
+def updated_member(updated):
+    print('chat_member_handler -----> ', updated)
+    if updated.new_chat_member:
+        print(updated.new_chat_member)
+        print(updated.new_chat_member.status)
+        print(updated.new_chat_member.user.id)
+        print(updated.new_chat_member.user.username)
+        print(updated.new_chat_member.user.first_name)
+        print(updated.new_chat_member.user.last_name)
+        print(updated.new_chat_member.user.language_code)
+        
 
 # @bot.message_handler(func=lambda message: message.entities is not None and message.chat.id == message.chat.id)
 # def delete_links(message):
@@ -350,4 +368,5 @@ def bad_message(message):
 # tb.send_photo(chat_id, photo)
 # tb.send_photo(chat_id, "FILEID")
 
-bot.polling(none_stop=True)
+bot.infinity_polling(allowed_updates=update_types)
+# bot.polling(none_stop=True)
