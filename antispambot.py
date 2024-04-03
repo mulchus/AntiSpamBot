@@ -1,11 +1,11 @@
-import config
 import telebot
 import time
 import markups as m
 import json
+import config
 
 from environs import Env
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+# from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from telebot.apihelper import ApiTelegramException
 from telebot.util import update_types
 from datetime import datetime
@@ -31,26 +31,34 @@ bot = telebot.TeleBot(bot_token)
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
-    inline_message = bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    with open('bot_settings.json', 'r+') as f:
-        config.bot_settings = json.load(f)
-    new_chat = 0    # проверяем наличие чата в списке конфиг и
-    for chat_settings in config.bot_settings:
-        if message.chat.id in chat_settings.values():
-            # print('Я знаю этот чат!')
-            new_chat = 1
-    if not new_chat:  # если знакомый чат не найден - добавляем текущий чат в список конфига
-        chat_settings = {'chat_id': message.chat.id, 'forbidden_message': config.allowed_types_message}
-        config.bot_settings.append(chat_settings)
+    bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+    with open('bot_settings.json', 'r+') as file:
+        config.bot_settings = json.load(file)
+        print(config.bot_settings)
+        print(config.bot_settings.keys())
+    
+    # TODO: Есть ошибка проверки на наличие чата в списке конфига, дублирует с ID = int
+    if message.chat.id in config.bot_settings.keys():
+        print('Я знаю этот чат!')
+    else:   # если знакомый чат не найден - добавляем текущий чат в список конфига
+        chat_settings = {'forbidden_messages': config.other_types_of_message, 'controlled_users': []}
+        config.bot_settings[message.chat.id] = chat_settings
         bot_settings_save(config.bot_settings)
+        print(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
-        with open('wordfilter.txt') as f:  # создание списка плохих слов из файла csv
-            config.mat = f.read().split(', ')
-            f.close()
-            info_message = bot.send_message(message.chat.id, f'Словарь мата загружен')  # , reply_markup=m.end_markup
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-            # time.sleep(config.pause)
-            # time.sleep(config.pause)
+        with open('wordfilter.txt') as file:  # создание списка плохих слов из файла txt
+            config.mat = file.read().split(', ')
+            file.close()
+        info_message = bot.send_message(message.chat.id, f'Словарь мата загружен')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        # time.sleep(config.pause)
+        # time.sleep(config.pause)
+    if not config.financial_words:  # если словарь финансовых понятий еще пустой
+        with open('financial_words.txt') as file:  # создание списка финансовых понятий из файла txt
+            config.financial_words = file.read().split(', ')
+            file.close()
+        info_message = bot.send_message(message.chat.id, f'Словарь финансовых понятий загружен')
+        del_bot_mes(message.chat.id, info_message.message_id, 0)
     info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
     del_bot_mes(message.chat.id, info_message.message_id, 0)
 
@@ -89,14 +97,14 @@ def callback_inline(call):
             previous_markup = 'start_markup'
             previous_message = (bot.send_message(call.message.chat.id, config.help)).message_id
             bot.send_message(call.message.chat.id, "Помощь", reply_markup=m.exit_markup)
-        if call.data == "forbidden_message":
+        if call.data == "forbidden_messages":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
             for bot_settings in config.bot_settings:
                 if bot_settings["chat_id"] == call.message.chat.id:
                     bot.send_message(call.message.chat.id, f'Запрещенные сообщения: \
-                                         {bot_settings["forbidden_message"]}', reply_markup=m.forbidden_message_markup)
+                                         {bot_settings["forbidden_messages"]}', reply_markup=m.forbidden_message_markup)
         if call.data == "bad_words":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
@@ -112,24 +120,24 @@ def callback_inline(call):
             # if call.message.text == 'ля':
             #     bot.send_message(call.message.chat.id, 'Верный ответ!')
 
-        if call.data in config.allowed_types_message:
+        if call.data in config.other_types_of_message:
             previous_markup = 'menu_markup'
             previous_message = 0
             for chat_settings in config.bot_settings:
                 if call.message.chat.id in chat_settings.values():
-                    if call.data in chat_settings['forbidden_message']:
-                        (chat_settings['forbidden_message']).remove(call.data)
+                    if call.data in chat_settings['forbidden_messages']:
+                        (chat_settings['forbidden_messages']).remove(call.data)
                         mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
                         time.sleep(config.pause)
                         del_bot_mes(call.message.chat.id, mes1.message_id, 0)
                         bot_settings_save(config.bot_settings)
                     else:
-                        (chat_settings['forbidden_message']).append(call.data)
+                        (chat_settings['forbidden_messages']).append(call.data)
                         mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
                         time.sleep(config.pause)
                         del_bot_mes(call.message.chat.id, mes1.message_id, 0)
                         bot_settings_save(config.bot_settings)
-        # print(config.allowed_types_message)
+        # print(config.forbidden_messages)
 
         if call.data == "exit":
             # print(call.message.message_id)
@@ -299,50 +307,78 @@ def delete(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def bad_text(message):
-    
+    print(message.from_user.id)
+    print(message.text)
+    print(config.financial_words)
+    print(len(set(message.text.split(' ')).intersection(config.financial_words)))
+    message_words = set([word.lower() for word in message.text.split(' ')])
+    if (message.from_user.id in config.bot_settings[message.chat.id].get('controlled_users') and
+            len(message_words.intersection(config.financial_words)) > 0):
+        print(f'Впойман криптоман {message.from_user.username}, удаляем!!!')
+        info_message = bot.send_message(message.chat.id, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        
+        # TODO: Добавить блокировку и удаление юзера.
+        return
     try:
-        mats_words = ''
+        mats_words = []
         for word in message.text.split(' '):
             supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
-            for word_from_slovar in config.mat:
-                if supword == word_from_slovar:  # проверяем на мат
-                    mats_words += (word + ', ')
-        if mats_words != '':
-            info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words[:-2]}"!')
+            if supword in config.mat:   # проверяем на мат
+                mats_words.append(word)
+        if len(mats_words) > 0:
+            info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words}"!')
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         print(repr(e))
 
+
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
 # сообщения бота
-
-
-@bot.message_handler(content_types=config.allowed_types_message)
+@bot.message_handler(content_types=config.other_types_of_message)
 def bad_message(message):
     print(message.chat.id)
     print(message.content_type)
     try:
-        for chat_settings in config.bot_settings:
-            if message.chat.id in chat_settings.values():
-                if message.content_type in chat_settings['forbidden_message']:
-                    info_message = bot.send_message(message.chat.id, f'Размещение формата \
-                                                            \b{message.content_type}\b запрещено! Удаляю!')
-                    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        # for chat_settings in config.bot_settings:
+        #     if message.chat.id in chat_settings.values():
+        if message.content_type in config.bot_settings[message.chat.id]['forbidden_messages']:
+            info_message = bot.send_message(message.chat.id, f'Размещение формата \
+                                                    \b{message.content_type}\b запрещено! Удаляю!')
+            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         print(repr(e))
-
-
+    
+    
 @bot.chat_member_handler()
-def updated_member(updated):
-    print('chat_member_handler -----> ', updated)
+def check_member_login(updated):
+    # print('chat_member_handler -----> ', updated)
     if updated.new_chat_member:
-        print(updated.new_chat_member)
-        print(updated.new_chat_member.status)
-        print(updated.new_chat_member.user.id)
-        print(updated.new_chat_member.user.username)
-        print(updated.new_chat_member.user.first_name)
-        print(updated.new_chat_member.user.last_name)
-        print(updated.new_chat_member.user.language_code)
+        # print(updated.new_chat_member)
+        # print(updated.new_chat_member.status)
+        # print(updated.new_chat_member.user.id)
+        # print(updated.new_chat_member.user.username)
+        # print(updated.new_chat_member.user.first_name)
+        # print(updated.new_chat_member.user.last_name)
+        # print(updated.new_chat_member.user.language_code)
+        # print(updated.new_chat_member.user.is_bot)
+
+        # try:
+        # print(updated.chat.id)
+        # print(config.bot_settings.get(updated.chat.id))
+        # print(config.bot_settings)
+        # print(config.bot_settings[updated.chat.id].get('controlled_users'))
+        
+        # controlled_users = config.bot_settings[updated.chat.id].get('controlled_users')
+        # print('Я знаю юзеров: ', controlled_users)
+        if updated.new_chat_member.user.id in config.bot_settings[updated.chat.id].get('controlled_users'):
+            print('Я знаю этого юзера!')
+        else:
+            print('Я НЕ знаю этого юзера! Добавил')
+            config.bot_settings[updated.chat.id]['controlled_users'].append(updated.new_chat_member.user.id)
+            bot_settings_save(config.bot_settings)
+        # except Exception as e:
+        #     print(repr(e))
         
 
 # @bot.message_handler(func=lambda message: message.entities is not None and message.chat.id == message.chat.id)

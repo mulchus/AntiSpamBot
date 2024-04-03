@@ -1,11 +1,12 @@
 # конфигурация бота (константы)
 
-black_simvols = set('!"№;%:?*()_+-~!@#$^&\/<>{}[]|1234567890.,=')
+black_simvols = set('!"№;%:?*()_+-~!@#$^&\\/<>{}[]|1234567890.,=')
 user = ''
 mat = []
-allowed_types_message = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice', 'document', 'caption', 'contact', 'location', 'venue', 'animation']
-bot_settings = []
-# bot_settings['forbidden_message'] = all_types_message # не идет - изменяется и переменная и словарь одновременно
+financial_words = []
+other_types_of_message = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice', 'document', 'caption', 'contact', 'location', 'venue', 'animation']
+bot_settings = {}
+# bot_settings['forbidden_message'] = forbidden_messages # не идет - изменяется и переменная и словарь одновременно
 #bot_settings['forbidden_message'] = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice']
 pause = 1
 command_from_markup = []
