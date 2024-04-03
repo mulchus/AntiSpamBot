@@ -6,6 +6,7 @@ import json
 
 from environs import Env
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.apihelper import ApiTelegramException
 from datetime import datetime
 
 
@@ -217,20 +218,24 @@ def show(message):
     except ValueError:
         info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    else:
+        return
+    try:
         admins = bot.get_chat_administrators(message.chat.id)
-        admins_id = []
-        for i in range(len(admins)):  # формируем список ID админов чата из списка инфо об админах
-            admins_id.append(admins[i].user.id)
-        if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
-            info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-        elif object_ == 'admins':  # если команда "/show admins", то вывод админов:
-            list_admins = ''
-            for i in range(len(admins)):
-                list_admins += f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n'
-            info_message = bot.send_message(message.chat.id, list_admins)
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    except ApiTelegramException:
+        info_message = bot.send_message(message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        return
+    admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
+
+    if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
+        info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    elif object_ == 'admins':  # если команда "/show admins", то вывод админов:
+        list_admins = ''
+        for i in range(len(admins)):
+            list_admins += f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n'
+        info_message = bot.send_message(message.chat.id, list_admins)
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
 
 
 @bot.message_handler(commands=['pause'])
