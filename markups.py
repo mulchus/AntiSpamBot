@@ -1,5 +1,5 @@
 from telebot import types
-
+from config import other_types_of_message
 
 start_markup = types.InlineKeyboardMarkup(row_width=2)
 start_markup_btn1 = types.InlineKeyboardButton('Меню', callback_data='menu')
@@ -12,24 +12,31 @@ exit_markup_btn = types.InlineKeyboardButton('Назад', callback_data='exit')
 exit_markup.add(exit_markup_btn)
 
 menu_markup = types.InlineKeyboardMarkup(row_width=2)
-menu_markup_fb = types.InlineKeyboardButton('Запрещенные сообщения', callback_data='forbidden_message')
+menu_markup_fb = types.InlineKeyboardButton('Запрещенные сообщения', callback_data='forbidden_messages')
 menu_markup_bw = types.InlineKeyboardButton('Плохие слова', callback_data='bad_words')
 menu_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
 menu_markup.add(menu_markup_fb, menu_markup_bw, menu_markup_exit)
 
+#TODO подставить русские названия на клавиатуру
 forbidden_message_markup = types.InlineKeyboardMarkup(row_width=2)
-forbidden_message_markup_audio = types.InlineKeyboardButton('Аудио', callback_data='audio')
-forbidden_message_markup_photo = types.InlineKeyboardButton('Фото', callback_data='photo')
-forbidden_message_markup_sticker = types.InlineKeyboardButton('Стикер', callback_data='sticker')
-forbidden_message_markup_video = types.InlineKeyboardButton('Видео', callback_data='video')
-forbidden_message_markup_video_note = types.InlineKeyboardButton('Видеосообщение', callback_data='video_note')
-forbidden_message_markup_voice = types.InlineKeyboardButton('Голос', callback_data='voice')
-forbidden_message_markup_document = types.InlineKeyboardButton('Документ', callback_data='document')
-forbidden_message_markup_animation = types.InlineKeyboardButton('Анимация(GIF)', callback_data='animation')
+buttons = [types.InlineKeyboardButton(mes_type, callback_data=mes_type) \
+           for mes_type in other_types_of_message]
+
+# forbidden_message_markup_audio = types.InlineKeyboardButton('Аудио', callback_data='audio')
+# forbidden_message_markup_photo = types.InlineKeyboardButton('Фото', callback_data='photo')
+# forbidden_message_markup_sticker = types.InlineKeyboardButton('Стикер', callback_data='sticker')
+# forbidden_message_markup_video = types.InlineKeyboardButton('Видео', callback_data='video')
+# forbidden_message_markup_video_note = types.InlineKeyboardButton('Видеосообщение', callback_data='video_note')
+# forbidden_message_markup_voice = types.InlineKeyboardButton('Голос', callback_data='voice')
+# forbidden_message_markup_document = types.InlineKeyboardButton('Документ', callback_data='document')
+# forbidden_message_markup_caption = types.InlineKeyboardButton('Подпись', callback_data='caption')
+# forbidden_message_markup_contact = types.InlineKeyboardButton('Контакт', callback_data='contact')
+# forbidden_message_markup_location = types.InlineKeyboardButton('Локация', callback_data='location')
+# forbidden_message_markup_venue = types.InlineKeyboardButton('Место встречи', callback_data='venue')
+# forbidden_message_markup_animation = types.InlineKeyboardButton('Анимация (GIF)', callback_data='animation')
+
 forbidden_message_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
-forbidden_message_markup.add(forbidden_message_markup_audio, forbidden_message_markup_photo, forbidden_message_markup_sticker,
-                forbidden_message_markup_video, forbidden_message_markup_video_note, forbidden_message_markup_voice, forbidden_message_markup_document,
-                forbidden_message_markup_animation, forbidden_message_markup_exit)
+forbidden_message_markup.add(*buttons, forbidden_message_markup_exit)
 
 bad_words_markup = types.InlineKeyboardMarkup(row_width=2)
 bad_words_markup_add = types.InlineKeyboardButton('Добавить', callback_data='bad_words_add')

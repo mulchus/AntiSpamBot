@@ -4,7 +4,10 @@ black_simvols = set('!"№;%:?*()_+-~!@#$^&\\/<>{}[]|1234567890.,=')
 user = ''
 mat = []
 financial_words = []
-other_types_of_message = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice', 'document', 'caption', 'contact', 'location', 'venue', 'animation']
+other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker': 'стикер', 'video': 'видео',
+                          'video_note': 'видеосообщение', 'voice': 'голос', 'document': 'документ',
+                          'caption': 'подпись', 'contact': 'контакт', 'location': 'локация',
+                          'venue': 'место встречи', 'animation': 'анимация (gif)'}
 bot_settings = {}
 # bot_settings['forbidden_message'] = forbidden_messages # не идет - изменяется и переменная и словарь одновременно
 #bot_settings['forbidden_message'] = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice']

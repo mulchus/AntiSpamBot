@@ -39,13 +39,13 @@ def start(message):
     with open('bot_settings.json', 'r+') as file:
         config.bot_settings = json.load(file)
         logger.info(config.bot_settings)
-        logger.info(config.bot_settings.keys())
+        # logger.info(config.bot_settings.keys())
     if str(message.chat.id) in config.bot_settings.keys():
         logger.info('Я знаю этот чат!')
     else:   # если знакомый чат не найден - добавляем текущий чат в список конфига
         chat_settings = {'forbidden_messages': config.other_types_of_message, 'controlled_users': {}}
         config.bot_settings[str(message.chat.id)] = chat_settings
-        bot_settings_save(config.bot_settings)
+        save_bot_settings(config.bot_settings)
         logger.info(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
         with open('wordfilter.txt') as file:  # создание списка плохих слов из файла txt
@@ -72,7 +72,7 @@ def menu(message):
         bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
 
 
-def bot_settings_save(bot_settings):    # сохранение списка настроек разных чатов в файл
+def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
     f = open('bot_settings.json', 'w+')
     f.seek(0)
     f.write(json.dumps(bot_settings))
@@ -86,11 +86,13 @@ def callback_inline(call):
     # global info_message
     # try:
     if call.message:
+
         if call.data == "menu":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)
             bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
             previous_markup = 'start_markup'
             previous_message = 0
+
         if call.data == "help":
             # print(config.help)
             # bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
@@ -99,19 +101,24 @@ def callback_inline(call):
             previous_markup = 'start_markup'
             previous_message = (bot.send_message(call.message.chat.id, config.help)).message_id
             bot.send_message(call.message.chat.id, "Помощь", reply_markup=m.exit_markup)
+
+        #TODO подставить русские названия на клавиатуру
         if call.data == "forbidden_messages":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
-            for bot_settings in config.bot_settings:
-                if bot_settings["chat_id"] == call.message.chat.id:
-                    bot.send_message(call.message.chat.id, f'Запрещенные сообщения: \
-                                         {bot_settings["forbidden_messages"]}', reply_markup=m.forbidden_message_markup)
+            if str(call.message.chat.id) in config.bot_settings.keys():
+                bot.send_message(call.message.chat.id,
+                                 f'Запрещенные сообщения: '
+                                 f'{config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]}',
+                                 reply_markup=m.forbidden_message_markup)
+
         if call.data == "bad_words":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
             bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
+
         if call.data == "bad_words_add":
             # del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             # previous_markup = 'menu_markup'
@@ -122,23 +129,22 @@ def callback_inline(call):
             # if call.message.text == 'ля':
             #     bot.send_message(call.message.chat.id, 'Верный ответ!')
 
-        if call.data in config.other_types_of_message:
+        if call.data in config.other_types_of_message.keys():
             previous_markup = 'menu_markup'
             previous_message = 0
-            for chat_settings in config.bot_settings:
-                if call.message.chat.id in chat_settings.values():
-                    if call.data in chat_settings['forbidden_messages']:
-                        (chat_settings['forbidden_messages']).remove(call.data)
-                        mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
-                        time.sleep(config.pause)
-                        del_bot_mes(call.message.chat.id, mes1.message_id, 0)
-                        bot_settings_save(config.bot_settings)
-                    else:
-                        (chat_settings['forbidden_messages']).append(call.data)
-                        mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
-                        time.sleep(config.pause)
-                        del_bot_mes(call.message.chat.id, mes1.message_id, 0)
-                        bot_settings_save(config.bot_settings)
+            if str(call.message.chat.id) in config.bot_settings.keys():
+                if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
+                    (config.bot_settings[str(call.message.chat.id)]['forbidden_messages']).remove(call.data)
+                    mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
+                    time.sleep(config.pause)
+                    del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+                    save_bot_settings(config.bot_settings)
+                else:
+                    (config.bot_settings[str(call.message.chat.id)]['forbidden_messages']).append(call.data)
+                    mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
+                    time.sleep(config.pause)
+                    del_bot_mes(call.message.chat.id, mes1.message_id, 0)
+                    save_bot_settings(config.bot_settings)
         # print(config.forbidden_messages)
 
         if call.data == "exit":
@@ -362,7 +368,7 @@ def check_member_login(updated):
                             f' {updated.new_chat_member.user.id}. Добавил.')
                 config.bot_settings[str(updated.chat.id)]['controlled_users'][str(updated.new_chat_member.user.id)] = \
                     {'addition time': datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
-                bot_settings_save(config.bot_settings)
+                save_bot_settings(config.bot_settings)
     except Exception as e:
         logger.error(repr(e))
         
@@ -403,7 +409,7 @@ def create_bot_settings_file():
 
 def main():
     configuring_logging()
-    logger.info('ЗАПУСТИЛСЯ')
+    # logger.info('ЗАПУСТИЛСЯ')
     if not os.path.exists('bot_settings.json'):
         create_bot_settings_file()
     #TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
