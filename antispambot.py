@@ -5,7 +5,7 @@ import json
 import config
 import logging
 import logging.handlers
-import sys
+import os
 
 from environs import Env
 # from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -29,21 +29,6 @@ bot = telebot.TeleBot(bot_token)
 # кнопка СТАРТ
 # button_start = KeyboardButton('СТАРТ!')
 # greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
-
-
-def configuring_logging():
-    logger.setLevel(logging.INFO)
-    logger_handler = logging.StreamHandler()
-    # logger_handler = logging.handlers.RotatingFileHandler(
-    #     LOGFILE, maxBytes=(1048576*5), backupCount=3
-    # )
-    logger_formatter = logging.Formatter(
-        '%(asctime)s : %(levelname)s : %(message)s',
-        datefmt='%d-%m-%Y %H:%M:%S'
-    )
-    logger_handler.setFormatter(logger_formatter)
-    logger.addHandler(logger_handler)
-    return logger
 
 
 # запуск бота для инициализации стартовых процессов:
@@ -369,11 +354,12 @@ def bad_message(message):
 @bot.chat_member_handler()
 def check_member_login(updated):
     try:
-        if updated.new_chat_member:
+        if updated.new_chat_member.status == 'member':
             if str(updated.new_chat_member.user.id) in config.bot_settings[str(updated.chat.id)]['controlled_users'].keys():
-                logger.info('Я знаю этого юзера!')
+                logger.info(f'Я знаю этого юзера {updated.new_chat_member.user.username} {updated.new_chat_member.user.id}!')
             else:
-                logger.info('Я НЕ знаю этого юзера! Добавил.')
+                logger.info(f'Я не знаю этого юзера {updated.new_chat_member.user.username}'
+                            f' {updated.new_chat_member.user.id}. Добавил.')
                 config.bot_settings[str(updated.chat.id)]['controlled_users'][str(updated.new_chat_member.user.id)] = \
                     {'addition time': datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
                 bot_settings_save(config.bot_settings)
@@ -392,9 +378,34 @@ def check_member_login(updated):
 #             return
 
 
+
+def configuring_logging():
+    logger.setLevel(logging.INFO)
+    logger_handler = logging.StreamHandler()
+    # logger_handler = logging.handlers.RotatingFileHandler(
+    #     LOGFILE, maxBytes=(1048576*5), backupCount=3
+    # )
+    logger_formatter = logging.Formatter(
+        '%(asctime)s : %(levelname)s : %(message)s',
+        datefmt='%d-%m-%Y %H:%M:%S'
+    )
+    logger_handler.setFormatter(logger_formatter)
+    logger.addHandler(logger_handler)
+    return logger
+
+
+def create_bot_settings_file():
+    # os.mknod('bot_settings.json')
+    with open('bot_settings.json', 'w+') as file:
+        file.write('{}')
+        file.close()
+
+
 def main():
-    logger = configuring_logging()
+    configuring_logging()
     logger.info('ЗАПУСТИЛСЯ')
+    if not os.path.exists('bot_settings.json'):
+        create_bot_settings_file()
     #TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
     bot.infinity_polling(allowed_updates=update_types)
 
