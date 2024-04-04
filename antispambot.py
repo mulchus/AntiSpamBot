@@ -43,7 +43,7 @@ def start(message):
     if str(message.chat.id) in config.bot_settings.keys():
         logger.info('Я знаю этот чат!')
     else:   # если знакомый чат не найден - добавляем текущий чат в список конфига
-        chat_settings = {'forbidden_messages': config.other_types_of_message, 'controlled_users': {}}
+        chat_settings = {'forbidden_messages': list(config.other_types_of_message.keys()), 'controlled_users': {}}
         config.bot_settings[str(message.chat.id)] = chat_settings
         save_bot_settings(config.bot_settings)
         logger.info(config.bot_settings)
@@ -83,13 +83,11 @@ def save_bot_settings(bot_settings):    # сохранение списка на
 def callback_inline(call):
     global previous_markup
     global previous_message
-    # global info_message
-    # try:
     if call.message:
 
         if call.data == "menu":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
             bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
             previous_markup = 'start_markup'
             previous_message = 0
 
@@ -97,21 +95,21 @@ def callback_inline(call):
             # print(config.help)
             # bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
             #                              reply_markup='')  # удаляем кнопки у последнего сообщения
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
             previous_markup = 'start_markup'
             previous_message = (bot.send_message(call.message.chat.id, config.help)).message_id
             bot.send_message(call.message.chat.id, "Помощь", reply_markup=m.exit_markup)
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
 
-        #TODO подставить русские названия на клавиатуру
         if call.data == "forbidden_messages":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
             previous_message = 0
-            if str(call.message.chat.id) in config.bot_settings.keys():
-                bot.send_message(call.message.chat.id,
-                                 f'Запрещенные сообщения: '
-                                 f'{config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]}',
-                                 reply_markup=m.forbidden_message_markup)
+            bot.send_message(call.message.chat.id,
+                             f'Нажмите для изменения доступности:',
+                             reply_markup=m.forbidden_message_markup)
+            forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
+                                            config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
+            bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')
 
         if call.data == "bad_words":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
@@ -132,28 +130,31 @@ def callback_inline(call):
         if call.data in config.other_types_of_message.keys():
             previous_markup = 'menu_markup'
             previous_message = 0
-            if str(call.message.chat.id) in config.bot_settings.keys():
-                if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
-                    (config.bot_settings[str(call.message.chat.id)]['forbidden_messages']).remove(call.data)
-                    mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} разрешены")
-                    time.sleep(config.pause)
-                    del_bot_mes(call.message.chat.id, mes1.message_id, 0)
-                    save_bot_settings(config.bot_settings)
-                else:
-                    (config.bot_settings[str(call.message.chat.id)]['forbidden_messages']).append(call.data)
-                    mes1 = bot.send_message(call.message.chat.id, f"Cообщения типа {call.data} запрещены")
-                    time.sleep(config.pause)
-                    del_bot_mes(call.message.chat.id, mes1.message_id, 0)
-                    save_bot_settings(config.bot_settings)
-        # print(config.forbidden_messages)
+            if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
+                config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].remove(call.data)
+                last_message = bot.send_message(
+                    call.message.chat.id,
+                    f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.')
+                time.sleep(config.pause)
+                del_bot_mes(call.message.chat.id, last_message.message_id, 0)
+                save_bot_settings(config.bot_settings)
+            else:
+                config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].append(call.data)
+                last_message = bot.send_message(
+                    call.message.chat.id,
+                    f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.')
+                time.sleep(config.pause)
+                del_bot_mes(call.message.chat.id, last_message.message_id, 0)
+                save_bot_settings(config.bot_settings)
+            forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
+                                            config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
+            last_message = bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')
+            del_bot_mes(call.message.chat.id, last_message.message_id-2, 0)
 
         if call.data == "exit":
             # print(call.message.message_id)
             # bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
             #                               reply_markup='')  # удаляем кнопки у последнего сообщения
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            if previous_message:
-                bot.delete_message(call.message.chat.id, previous_message)
             if previous_markup == 'start_markup':
                 bot.send_message(call.message.chat.id, f"Меню в чате № {call.message.chat.id}!",
                                  reply_markup=m.start_markup)
@@ -167,6 +168,10 @@ def callback_inline(call):
             elif previous_markup == 'bad_words':
                 bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
                 previous_markup = 'menu_markup'
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.delete_message(call.message.chat.id, call.message.message_id+1)
+            if previous_message:
+                bot.delete_message(call.message.chat.id, previous_message)
 
     # except Exception as e:
     #     print(repr(e))
@@ -314,7 +319,7 @@ def delete(message):
 
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
-def bad_text(message):
+def check_for_bad_text(message):
     logger.info(message.from_user.id)
     logger.info(message.text)
 
@@ -343,15 +348,14 @@ def bad_text(message):
 # проверка поступившего сообщения на графику, стикеры, видео, аудио и удаление его, а также позже - удаление
 # сообщения бота
 @bot.message_handler(content_types=config.other_types_of_message)
-def bad_message(message):
+def check_for_bad_message(message):
     logger.info(message.chat.id)
     logger.info(message.content_type)
     try:
-        # for chat_settings in config.bot_settings:
-        #     if message.chat.id in chat_settings.values():
         if message.content_type in config.bot_settings[str(message.chat.id)]['forbidden_messages']:
-            info_message = bot.send_message(message.chat.id, f'Размещение формата \
-                                                    \b{message.content_type}\b запрещено! Удаляю!')
+            info_message = bot.send_message(
+                message.chat.id,
+                f'Размещение формата {config.other_types_of_message[message.content_type]} запрещено! Удаляю!')
             del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as e:
         logger.error(repr(e))
