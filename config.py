@@ -9,8 +9,6 @@ other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker':
                           'caption': 'подпись', 'contact': 'контакт', 'location': 'локация',
                           'venue': 'место встречи', 'animation': 'анимация (gif)'}
 bot_settings = {}
-# bot_settings['forbidden_message'] = forbidden_messages # не идет - изменяется и переменная и словарь одновременно
-#bot_settings['forbidden_message'] = ['audio', 'photo', 'sticker', 'video', 'video_note', 'voice']
 pause = 1
 command_from_markup = []
 

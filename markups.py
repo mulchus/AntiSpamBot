@@ -35,7 +35,6 @@ y_n_markup_y = types.InlineKeyboardButton('Да', callback_data='yes')
 y_n_markup_n = types.InlineKeyboardButton('Нет', callback_data='no')
 y_n_markup.add(y_n_markup_y, y_n_markup_n)
 
-
 # start_markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True, input_field_placeholder='ПРИВЕТУСЫ')
 # start_markup_btn1 = types.KeyboardButton('/start')
 # start_markup_btn2 = types.KeyboardButton('/del')
