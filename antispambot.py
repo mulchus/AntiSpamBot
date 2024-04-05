@@ -8,15 +8,12 @@ import logging.handlers
 import os
 
 from environs import Env
-# from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from telebot.apihelper import ApiTelegramException
 from telebot.util import update_types
 from datetime import datetime
 
 previous_markup = None
 previous_message = None
-time_start = ''
-time_end = ''
 
 LOGFILE = 'logs.txt'
 logger = logging.getLogger()
@@ -43,7 +40,7 @@ def checking_for_admin(message):
         info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
         return False
-    return True
+    return admins
 
 
 # запуск бота для инициализации стартовых процессов:
@@ -84,8 +81,7 @@ def menu(message):
     if config.mat:  # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
         bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     else:
-        info_message = bot.send_message(message.chat.id, 'Для начаоа работы жми /start')
-        del_bot_mes(message.chat.id, info_message.message_id, 0)
+        send_about_something(message, 'Для начаоа работы жми /start')
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -160,19 +156,13 @@ def callback_inline(call):
             previous_message = 0
             if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].remove(call.data)
-                last_message = bot.send_message(
-                    call.message.chat.id,
-                    f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.')
-                time.sleep(config.pause)
-                del_bot_mes(call.message.chat.id, last_message.message_id, 0)
+                send_about_something(call.message,
+                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.', False)
                 save_bot_settings(config.bot_settings)
             else:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].append(call.data)
-                last_message = bot.send_message(
-                    call.message.chat.id,
-                    f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.')
-                time.sleep(config.pause)
-                del_bot_mes(call.message.chat.id, last_message.message_id, 0)
+                send_about_something(call.message,
+                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.', False)
                 save_bot_settings(config.bot_settings)
             forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
                                             config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
@@ -202,24 +192,27 @@ def callback_inline(call):
 
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
-def add_word(message, word_type):
+def add_word(message, word_type='bad'):
     def add_word_to_file(file_name, word, data_list_name):
         with open(file_name, 'a') as file:
             file.write(', ' + word)
             file.close()
             data_list_name.append(word)
-            return bot.send_message(message.chat.id, f'В базу добавлено слово "{word}"')
+            send_about_something(message, f'В базу {word_type.upper()} добавлено слово "{word}"')
+            return
     try:
+        if not checking_for_admin(message):
+            return
         if config.command_from_markup:
             message.text = 'addword ' + message.text
         _, new_word = message.text.split(maxsplit=1)
+        new_word = new_word.lower()
         if word_type == 'bad' and new_word not in config.mat:
-            info_message = add_word_to_file(config.mat_file, new_word, config.mat)
+            add_word_to_file(config.mat_file, new_word, config.mat)
         elif word_type == 'finance' and new_word not in config.finance_words:
-            info_message = add_word_to_file(config.finance_words_file, new_word, config.finance_words)
+            add_word_to_file(config.finance_words_file, new_word, config.finance_words)
         else:
-            info_message = bot.send_message(message.chat.id, f'В базе есть слово "{new_word}"')
-        del_bot_mes(message.chat.id, info_message.message_id, message.message_id)
+            send_about_something(message, f'В базе {word_type.upper()} уже есть слово "{new_word}"')
         if config.command_from_markup:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
             config.command_from_markup = None
@@ -229,24 +222,27 @@ def add_word(message, word_type):
 
 # Удаление слов из БД
 @bot.message_handler(commands=['delword'])
-def del_word(message, word_type):
+def del_word(message, word_type='bad'):
     def del_word_from_file(file_name, word, data_list_name):
         with open(file_name, 'w') as file:
             data_list_name.remove(word)
             file.write(', '.join(data_list_name))
             file.close()
-            return bot.send_message(message.chat.id, f'Из базы удалено слово "{word}"')
+            send_about_something(message, f'Из базы {word_type.upper()} удалено слово "{word}"')
+            return
     try:
+        if not checking_for_admin(message):
+            return
         if config.command_from_markup:
             message.text = 'delword ' + message.text
         _, removing_word = message.text.split(maxsplit=1)
+        removing_word = removing_word.lower()
         if word_type == 'bad' and removing_word in config.mat:
-            info_message = del_word_from_file(config.mat_file, removing_word, config.mat)
+            del_word_from_file(config.mat_file, removing_word, config.mat)
         elif word_type == 'finance' and removing_word in config.finance_words:
-            info_message = del_word_from_file(config.finance_words_file, removing_word, config.finance_words)
+            del_word_from_file(config.finance_words_file, removing_word, config.finance_words)
         else:
-            info_message = bot.send_message(message.chat.id, f'В базе нет слова "{removing_word}"')
-        del_bot_mes(message.chat.id, info_message.message_id, message.message_id)
+            send_about_something(message, f'В базе {word_type.upper()} нет слова "{removing_word}"')
         if config.command_from_markup:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
             config.command_from_markup = None
@@ -257,50 +253,37 @@ def del_word(message, word_type):
 # вывод сообщений, возможных к обработке
 @bot.message_handler(commands=['show'])
 def show(message):
-    # print(f'message {message}')
-    # bot.send_message(message.chat.id, f'group_id = {message.group_id}')
-    # print(f'message = {message}')
+    admins = checking_for_admin(message)
+    if not admins:
+        return
     try:
         _, object_ = message.text.split(maxsplit=1)
     except ValueError:
-        info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        send_about_something(message, 'Неверно введена команда. Проверьте формат через /help')
         return
-    try:
-        admins = bot.get_chat_administrators(message.chat.id)
-    except ApiTelegramException:
-        info_message = bot.send_message(
-            message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-        return
-    admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
-
-    if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
-        info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    elif object_ == 'admins':  # если команда "/show admins", то вывод админов:
-        list_admins = ''
-        for i in range(len(admins)):
-            list_admins += f'Админ №{i+1}: {admins[i].user.username}, Бот = {admins[i].user.is_bot}\n'
-        info_message = bot.send_message(message.chat.id, list_admins)
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    
+    if object_ == 'admins':  # если команда "/show admins", то вывод админов:
+        list_admins = [
+            f'Админ {num+1}: @{admin.user.username}{", бот" if admin.user.is_bot else ""}\n'
+            for num, admin in enumerate(admins)
+        ]
+        send_about_something(message, ''.join(list_admins) + f'\nВсего админов: {len(list_admins)}')
 
 
 @bot.message_handler(commands=['pause'])
 def pause(message):
+    if not checking_for_admin(message):
+        return
     try:
         _, sec = message.text.split(maxsplit=1)
     except ValueError:
-        info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
-        del_bot_mes(message.chat.id, info_message.message_id, 0)
+        send_about_something(message, 'Неверно введена команда. Проверьте формат через /help')
+        return
+    if sec.isdigit() and (0 < int(sec) <= 5):
+        config.pause = int(sec)
+        send_about_something(message, f'Пауза отображения сообщения бота теперь = {sec} секунд')
     else:
-        if sec.isdigit():
-            config.pause = int(sec)
-            info_message = bot.send_message(message.chat.id, f'Пауза отображения сообщения бота теперь = {sec} секунд')
-            del_bot_mes(message.chat.id, info_message.message_id, 0)
-        else:
-            info_message = bot.send_message(message.chat.id, f'Неверно введена команда. Проверьте формат через /help')
-            del_bot_mes(message.chat.id, info_message.message_id, 0)
+        send_about_something(message, 'Значение должно быть числом от 0.1 до 5')
 
 
 @bot.message_handler(commands=['help'])
@@ -317,8 +300,7 @@ def check_for_bad_text(message):
     if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
             len(message_words.intersection(config.finance_words)) > 0):
         logger.info(f'Впойман криптоман {message.from_user.username}, удаляем!!!')
-        info_message = bot.send_message(message.chat.id, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        send_about_something(message, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
         bot.kick_chat_member(message.chat.id, message.from_user.id)
         return
     try:
@@ -328,8 +310,7 @@ def check_for_bad_text(message):
             if supword in config.mat:   # проверяем на мат
                 mats_words.append(word)
         if len(mats_words) > 0:
-            info_message = bot.send_message(message.chat.id, f'Зачем ругаешься? Ты сказал "{mats_words}"!')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            send_about_something(message, f'Зачем ругаешься? Ты сказал "{", ".join(mats_words)}"!')
     except Exception as error:
         logger.error(error)
 
@@ -392,6 +373,14 @@ def configuring_logging():
     return logger
 
 
+def send_about_something(message, message_text='', delete_second_message=True):
+    info_message = bot.send_message(message.chat.id, message_text)
+    if not delete_second_message:
+        del_bot_mes(message.chat.id, message.message_id, 0)
+        return
+    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+    
+    
 def create_bot_settings_file():
     # os.mknod('bot_settings.json')
     with open('bot_settings.json', 'w+') as file:
@@ -404,7 +393,6 @@ def del_bot_mes(chat_id, mes_id, info_mes_id):
     time.sleep(config.pause)
     bot.delete_message(chat_id, mes_id)
     if info_mes_id:
-        time.sleep(config.pause)
         bot.delete_message(chat_id, info_mes_id)
 
 
