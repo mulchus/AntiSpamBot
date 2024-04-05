@@ -30,10 +30,27 @@ bot = telebot.TeleBot(bot_token)
 # button_start = KeyboardButton('СТАРТ!')
 # greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
 
+def checking_for_admin(message):
+    try:
+        admins = bot.get_chat_administrators(message.chat.id)
+    except ApiTelegramException:
+        info_message = bot.send_message(
+            message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        return False
+    admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
+    if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
+        info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
+        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        return False
+    return True
+
 
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
+    if not checking_for_admin(message):
+        return
     bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('bot_settings.json', 'r+') as file:
         config.bot_settings = json.load(file)
@@ -62,8 +79,13 @@ def start(message):
 # вызов меню:
 @bot.message_handler(commands=['menu'])
 def menu(message):
+    if not checking_for_admin(message):
+        return
     if config.mat:  # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
         bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+    else:
+        info_message = bot.send_message(message.chat.id, 'Для начаоа работы жми /start')
+        del_bot_mes(message.chat.id, info_message.message_id, 0)
 
 
 @bot.callback_query_handler(func=lambda call: True)
