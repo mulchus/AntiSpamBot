@@ -14,13 +14,13 @@ exit_markup.add(exit_markup_btn)
 menu_markup = types.InlineKeyboardMarkup(row_width=2)
 menu_markup_fb = types.InlineKeyboardButton('Запрещенные сообщения', callback_data='forbidden_messages')
 menu_markup_bw = types.InlineKeyboardButton('Плохие слова', callback_data='bad_words')
+menu_markup_fw = types.InlineKeyboardButton('Финансовые слова', callback_data='finance_words')
 menu_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
-menu_markup.add(menu_markup_fb, menu_markup_bw, menu_markup_exit)
+menu_markup.add(menu_markup_fb, menu_markup_bw, menu_markup_fw, menu_markup_exit)
 
 forbidden_message_markup = types.InlineKeyboardMarkup(row_width=2)
 buttons = [types.InlineKeyboardButton(other_types_of_message[mes_type], callback_data=mes_type)
            for mes_type in other_types_of_message]
-
 forbidden_message_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
 forbidden_message_markup.add(*buttons, forbidden_message_markup_exit)
 
@@ -29,6 +29,13 @@ bad_words_markup_add = types.InlineKeyboardButton('Добавить', callback_d
 bad_words_markup_del = types.InlineKeyboardButton('Удалить', callback_data='bad_words_del')
 bad_words_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
 bad_words_markup.add(bad_words_markup_add, bad_words_markup_del, bad_words_markup_exit)
+
+# TODO можно ли как то использовать одинаковые конпки для плохих слов и финансовых слов?
+finance_words_markup = types.InlineKeyboardMarkup(row_width=2)
+finance_words_markup_add = types.InlineKeyboardButton('Добавить', callback_data='finance_words_add')
+finance_words_markup_del = types.InlineKeyboardButton('Удалить', callback_data='finance_words_del')
+finance_words_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
+finance_words_markup.add(finance_words_markup_add, finance_words_markup_del, finance_words_markup_exit)
 
 y_n_markup = types.InlineKeyboardMarkup(row_width=2)
 y_n_markup_y = types.InlineKeyboardButton('Да', callback_data='yes')

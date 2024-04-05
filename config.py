@@ -3,7 +3,9 @@
 black_simvols = set('!"№;%:?*()_+-~!@#$^&\\/<>{}[]|1234567890.,=')
 user = ''
 mat = []
-financial_words = []
+mat_file = 'wordfilter.txt'
+finance_words = []
+finance_words_file = 'finance_words.txt'
 other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker': 'стикер', 'video': 'видео',
                           'video_note': 'видеосообщение', 'voice': 'голос', 'document': 'документ',
                           'caption': 'подпись', 'contact': 'контакт', 'location': 'локация',

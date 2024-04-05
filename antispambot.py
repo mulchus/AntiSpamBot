@@ -44,14 +44,14 @@ def start(message):
         config.bot_settings[str(message.chat.id)] = chat_settings
         save_bot_settings(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
-        with open('wordfilter.txt') as file:  # создание списка плохих слов из файла txt
+        with open(config.mat_file) as file:  # создание списка плохих слов из файла txt
             config.mat = file.read().split(', ')
             file.close()
         info_message = bot.send_message(message.chat.id, f'Словарь мата загружен')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    if not config.financial_words:  # если словарь финансовых понятий еще пустой
-        with open('financial_words.txt') as file:  # создание списка финансовых понятий из файла txt
-            config.financial_words = file.read().split(', ')
+    if not config.finance_words:  # если словарь финансовых понятий еще пустой
+        with open(config.finance_words_file) as file:  # создание списка финансовых понятий из файла txt
+            config.finance_words = file.read().split(', ')
             file.close()
         info_message = bot.send_message(message.chat.id, f'Словарь финансовых понятий загружен')
         del_bot_mes(message.chat.id, info_message.message_id, 0)
@@ -92,7 +92,7 @@ def callback_inline(call):
             forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
                                             config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
             bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')
-    
+
         if call.data == "bad_words":
             del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
             previous_markup = 'menu_markup'
@@ -104,14 +104,34 @@ def callback_inline(call):
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
             config.command_from_markup = 'addword'
-            bot.register_next_step_handler(last_message, add_word)
+            bot.register_next_step_handler(last_message, add_word, 'bad')
         
         if call.data == "bad_words_del":
             previous_markup = 'menu_markup'
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
             config.command_from_markup = 'delword'
-            bot.register_next_step_handler(last_message, del_word)
+            bot.register_next_step_handler(last_message, del_word, 'bad')
+
+        if call.data == "finance_words":
+            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            bot.send_message(call.message.chat.id, "Финансовые слова", reply_markup=m.finance_words_markup)
+
+        if call.data == "finance_words_add":
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
+            config.command_from_markup = 'addword'
+            bot.register_next_step_handler(last_message, add_word, 'finance')
+
+        if call.data == "finance_words_del":
+            previous_markup = 'menu_markup'
+            previous_message = 0
+            last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
+            config.command_from_markup = 'delword'
+            bot.register_next_step_handler(last_message, del_word, 'finance')
     
         if call.data in config.other_types_of_message.keys():
             previous_markup = 'menu_markup'
@@ -160,20 +180,24 @@ def callback_inline(call):
 
 # Добавление плохих слов в БД
 @bot.message_handler(commands=['addword'])
-def add_word(message):
+def add_word(message, word_type):
+    def add_word_to_file(file_name, word, data_list_name):
+        with open(file_name, 'a') as file:
+            file.write(', ' + word)
+            file.close()
+            data_list_name.append(word)
+            return bot.send_message(message.chat.id, f'В базу добавлено слово "{word}"')
     try:
         if config.command_from_markup:
             message.text = 'addword ' + message.text
-        _, newword = message.text.split(maxsplit=1)
-        if newword not in config.mat:
-            with open('wordfilter.txt', 'a') as f:
-                f.write(', ' + newword)
-                f.close()
-                config.mat.append(newword)
-                info_message = bot.send_message(message.chat.id, f'В базу плохих слов добавлено слово "{newword}"')
+        _, new_word = message.text.split(maxsplit=1)
+        if word_type == 'bad' and new_word not in config.mat:
+            info_message = add_word_to_file(config.mat_file, new_word, config.mat)
+        elif word_type == 'finance' and new_word not in config.finance_words:
+            info_message = add_word_to_file(config.finance_words_file, new_word, config.finance_words)
         else:
-            info_message = bot.send_message(message.chat.id, f'В базе плохих слов есть слово "{newword}"')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            info_message = bot.send_message(message.chat.id, f'В базе есть слово "{new_word}"')
+        del_bot_mes(message.chat.id, info_message.message_id, message.message_id)
         if config.command_from_markup:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
             config.command_from_markup = None
@@ -183,20 +207,24 @@ def add_word(message):
 
 # Удаление слов из БД
 @bot.message_handler(commands=['delword'])
-def del_word(message):
+def del_word(message, word_type):
+    def del_word_from_file(file_name, word, data_list_name):
+        with open(file_name, 'w') as file:
+            data_list_name.remove(word)
+            file.write(', '.join(data_list_name))
+            file.close()
+            return bot.send_message(message.chat.id, f'Из базы удалено слово "{word}"')
     try:
         if config.command_from_markup:
             message.text = 'delword ' + message.text
-        _, word = message.text.split(maxsplit=1)
-        if word in config.mat:
-            with open('wordfilter.txt', 'w') as f:
-                config.mat.remove(word)
-                f.write(', '.join(config.mat))
-                f.close()
-                info_message = bot.send_message(message.chat.id, f'Из базы плохих слов удалено слово "{word}"')
+        _, removing_word = message.text.split(maxsplit=1)
+        if word_type == 'bad' and removing_word in config.mat:
+            info_message = del_word_from_file(config.mat_file, removing_word, config.mat)
+        elif word_type == 'finance' and removing_word in config.finance_words:
+            info_message = del_word_from_file(config.finance_words_file, removing_word, config.finance_words)
         else:
-            info_message = bot.send_message(message.chat.id, f'В базе плохих слов нет слова "{word}"')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+            info_message = bot.send_message(message.chat.id, f'В базе нет слова "{removing_word}"')
+        del_bot_mes(message.chat.id, info_message.message_id, message.message_id)
         if config.command_from_markup:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
             config.command_from_markup = None
@@ -265,7 +293,7 @@ def check_for_bad_text(message):
     logger.info(message.text)
     message_words = set([word.lower() for word in message.text.split(' ')])
     if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
-            len(message_words.intersection(config.financial_words)) > 0):
+            len(message_words.intersection(config.finance_words)) > 0):
         logger.info(f'Впойман криптоман {message.from_user.username}, удаляем!!!')
         info_message = bot.send_message(message.chat.id, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
         del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
