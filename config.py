@@ -3,6 +3,7 @@
 black_simvols = set('!"№;%:?*()_+-~!@#$^&\\/<>{}[]|1234567890.,=')
 user = ''
 mat = []
+log_file = 'logs.txt'
 mat_file = 'wordfilter.txt'
 finance_words = []
 finance_words_file = 'finance_words.txt'
@@ -13,7 +14,7 @@ other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker':
 bot_settings = {}
 pause = 2
 command_from_markup = {}
-last_messages = {}
+last_messages_ids = {}
 
 help = '''Бот антиспам имеет следующие команды:
         /start - запуск/перезапуск бота

@@ -9,13 +9,9 @@ import os
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
-# from telebot.util import update_types
 from datetime import datetime
 
-previous_markup = None
-previous_message = None
 
-LOGFILE = 'logs.txt'
 logger = logging.getLogger()
 env = Env()
 env.read_env()
@@ -23,22 +19,15 @@ bot_token = env('BOT_TOKEN')
 bot = telebot.TeleBot(bot_token)
 
 
-# кнопка СТАРТ
-# button_start = KeyboardButton('СТАРТ!')
-# greet_kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).add(KeyboardButton('СТАРТ!'))
-
 def checking_for_admin(message):
     try:
         admins = bot.get_chat_administrators(message.chat.id)
     except ApiTelegramException:
-        info_message = bot.send_message(
-            message.chat.id, f'Команда доступна только в группе. В приватном чате нет администраторов.')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        send_about_something(message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
         return False
     admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
     if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
-        info_message = bot.send_message(message.chat.id, f'У вас недостаточно прав для этой команды')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        send_about_something(message, 'У вас недостаточно прав для этой команды.')
         return False
     return admins
 
@@ -53,24 +42,29 @@ def start(message):
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
         logger.info('Я знаю этот чат!')
+        config.bot_settings[str(message.chat.id)]['previous_markup'] = None
+        config.bot_settings[str(message.chat.id)]['previous_message'] = None
+        save_bot_settings(config.bot_settings)
     else:   # если знакомый чат не найден - добавляем текущий чат в список конфига
-        chat_settings = {'forbidden_messages': list(config.other_types_of_message.keys()), 'controlled_users': {}}
+        chat_settings = {
+            'forbidden_messages': list(config.other_types_of_message.keys()),
+            'controlled_users': {},
+            'previous_markup': None,
+            'previous_message': None,
+        }
         config.bot_settings[str(message.chat.id)] = chat_settings
         save_bot_settings(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
         with open(config.mat_file) as file:  # создание списка плохих слов из файла txt
             config.mat = file.read().split(', ')
             file.close()
-        info_message = bot.send_message(message.chat.id, f'Словарь мата загружен')
-        del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
+        send_about_something(message, 'Словарь мата загружен', False)
     if not config.finance_words:  # если словарь финансовых понятий еще пустой
         with open(config.finance_words_file) as file:  # создание списка финансовых понятий из файла txt
             config.finance_words = file.read().split(', ')
             file.close()
-        info_message = bot.send_message(message.chat.id, f'Словарь финансовых понятий загружен')
-        del_bot_mes(message.chat.id, info_message.message_id, 0)
-    info_message = bot.send_message(message.chat.id, f'Шеф. я запустился. Все ок!')  # , reply_markup=m.end_markup
-    del_bot_mes(message.chat.id, info_message.message_id, 0)
+        send_about_something(message, 'Словарь финансовых понятий загружен', False)
+    send_about_something(message, 'Шеф. я запустился. Все ок!')
 
 
 # вызов меню:
@@ -86,111 +80,95 @@ def menu(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    global previous_markup
-    global previous_message
     try:
         if call.data == "menu":
-            bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
-            previous_markup = 'start_markup'
-            previous_message = 0
+            send_about_something(call.message, "Настройки бота", True, False, m.menu_markup)
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
     
         if call.data == "help":
-            previous_markup = 'start_markup'
-            bot.send_message(call.message.chat.id, f'Помощь\n{config.help}', reply_markup=m.exit_markup)
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+            send_about_something(call.message, f'Помощь\n{config.help}', True, False, m.exit_markup)
     
         if call.data == "forbidden_messages":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
-            previous_markup = 'menu_markup'
-            previous_message = 0
-            bot.send_message(call.message.chat.id,
-                             f'Нажмите для изменения доступности:',
-                             reply_markup=m.forbidden_message_markup)
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+            send_about_something(call.message, 'Нажмите для изменения доступности:',
+                                 True, False, m.forbidden_message_markup)
             forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
                                             config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
             bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')
 
         if call.data == "bad_words":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
-            previous_markup = 'menu_markup'
-            previous_message = 0
-            bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
-    
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+            send_about_something(call.message, "Плохие слова", True, False, m.bad_words_markup)
+   
         if call.data == "bad_words_add":
-            previous_markup = 'menu_markup'
-            previous_message = 0
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
             config.command_from_markup[call.message.chat.id] = 'addword'
             bot.register_next_step_handler(last_message, add_word, 'bad')
         
         if call.data == "bad_words_del":
-            previous_markup = 'menu_markup'
-            previous_message = 0
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
             config.command_from_markup[call.message.chat.id] = 'delword'
             bot.register_next_step_handler(last_message, del_word, 'bad')
 
         if call.data == "finance_words":
-            del_bot_mes(call.message.chat.id, call.message.message_id, 0)  # и всё последнее сообщение
-            previous_markup = 'menu_markup'
-            previous_message = 0
-            bot.send_message(call.message.chat.id, "Финансовые слова", reply_markup=m.finance_words_markup)
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+            send_about_something(call.message, "Финансовые слова", True, False, m.finance_words_markup)
 
         if call.data == "finance_words_add":
-            previous_markup = 'menu_markup'
-            previous_message = 0
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
             config.command_from_markup[call.message.chat.id] = 'addword'
             bot.register_next_step_handler(last_message, add_word, 'finance')
 
         if call.data == "finance_words_del":
-            previous_markup = 'menu_markup'
-            previous_message = 0
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
             config.command_from_markup[call.message.chat.id] = 'delword'
             bot.register_next_step_handler(last_message, del_word, 'finance')
     
         if call.data in config.other_types_of_message.keys():
-            previous_markup = 'menu_markup'
-            previous_message = 0
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].remove(call.data)
-                info_message = bot.send_message(
-                    call.message.chat.id,
-                    f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.')
-                del_bot_mes(call.message.chat.id, info_message.message_id, 0)
+                send_about_something(call.message,
+                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.',
+                                     False, True)
                 save_bot_settings(config.bot_settings)
             else:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].append(call.data)
-                info_message = bot.send_message(
-                    call.message.chat.id,
-                    f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.',
-                )
-                del_bot_mes(call.message.chat.id, info_message.message_id, 0)
+                send_about_something(call.message,
+                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.',
+                                     False, True)
                 save_bot_settings(config.bot_settings)
             forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
                                             config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
-            previous_message = bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')
-            del_bot_mes(call.message.chat.id, previous_message.message_id-2, 0)
-    
+            config.bot_settings[str(call.message.chat.id)]['previous_message'] = \
+                (bot.send_message(call.message.chat.id, f'Запрещенные сообщения: {forbidden_messages}')).message_id
+            bot.delete_message(call.message.chat.id,
+                               config.bot_settings[str(call.message.chat.id)]['previous_message']-2)
+
         if call.data == "exit":
-            if previous_markup == 'start_markup':
+            if config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'start_markup':
                 bot.send_message(call.message.chat.id, f"Меню в чате № {call.message.chat.id}!",
                                  reply_markup=m.start_markup)
-                previous_markup = ''
-            elif previous_markup == 'menu_markup':
+                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = None
+            elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'menu_markup':
                 bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
-                previous_markup = 'start_markup'
-            elif previous_markup == 'forbidden_message_markup':
+                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+            elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'forbidden_message_markup':
                 bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
-                previous_markup = 'menu_markup'
-            elif previous_markup == 'bad_words':
+                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+            elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'bad_words':
                 bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
-                previous_markup = 'menu_markup'
+                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             bot.delete_message(call.message.chat.id, call.message.message_id)
-            if previous_message:
-                bot.delete_message(call.message.chat.id, previous_message)
+            if config.bot_settings[str(call.message.chat.id)]['previous_message']:
+                bot.delete_message(call.message.chat.id,
+                                   config.bot_settings[str(call.message.chat.id)]['previous_message'])
+                config.bot_settings[str(call.message.chat.id)]['previous_message'] = None
     except Exception as error:
         logger.error(error)
 
@@ -217,9 +195,10 @@ def add_word(message, word_type='bad'):
         elif word_type == 'finance' and new_word not in config.finance_words:
             add_word_to_file(config.finance_words_file, new_word, config.finance_words)
         else:
-            send_about_something(message, f'В базе {word_type.upper()} уже есть слово "{new_word}"')
+            send_about_something(
+                message, f'В базе {word_type.upper()} уже есть слово "{new_word}"')
         if config.command_from_markup[message.chat.id]:
-            del_bot_mes(message.chat.id, message.message_id - 1, 0)
+            bot.delete_message(message.chat.id, message.message_id - 1)
             config.command_from_markup[message.chat.id] = None
     except Exception as error:
         logger.error(error)
@@ -247,9 +226,10 @@ def del_word(message, word_type='bad'):
         elif word_type == 'finance' and removing_word in config.finance_words:
             del_word_from_file(config.finance_words_file, removing_word, config.finance_words)
         else:
-            send_about_something(message, f'В базе {word_type.upper()} нет слова "{removing_word}"')
+            send_about_something(
+                message, f'В базе {word_type.upper()} нет слова "{removing_word}"')
         if config.command_from_markup[message.chat.id]:
-            del_bot_mes(message.chat.id, message.message_id - 1, 0)
+            bot.delete_message(message.chat.id, message.message_id - 1)
             config.command_from_markup[message.chat.id] = None
     except Exception as error:
         logger.error(error)
@@ -272,7 +252,8 @@ def show(message):
             f'Админ {num+1}: @{admin.user.username}{", бот" if admin.user.is_bot else ""}\n'
             for num, admin in enumerate(admins)
         ]
-        send_about_something(message, ''.join(list_admins) + f'\nВсего админов: {len(list_admins)}')
+        send_about_something(
+            message, ''.join(list_admins) + f'\nВсего админов: {len(list_admins)}')
 
 
 @bot.message_handler(commands=['pause'])
@@ -305,7 +286,8 @@ def check_for_bad_text(message):
     if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
             len(message_words.intersection(config.finance_words)) > 0):
         logger.info(f'Впойман криптоман {message.from_user.username}, удаляем!!!')
-        send_about_something(message, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
+        send_about_something(
+            message, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
         bot.kick_chat_member(message.chat.id, message.from_user.id)
         return
     try:
@@ -326,10 +308,9 @@ def check_for_bad_text(message):
 def check_for_bad_message(message):
     try:
         if message.content_type in config.bot_settings[str(message.chat.id)]['forbidden_messages']:
-            info_message = bot.send_message(
-                message.chat.id,
+            send_about_something(
+                message,
                 f'Размещение формата {config.other_types_of_message[message.content_type]} запрещено! Удаляю!')
-            del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
     except Exception as error:
         logger.error(error)
     
@@ -367,7 +348,7 @@ def configuring_logging():
     logger.setLevel(logging.INFO)
     logger_handler = logging.StreamHandler()
     # logger_handler = logging.handlers.RotatingFileHandler(
-    #     LOGFILE, maxBytes=(1048576*5), backupCount=3
+    #     config.log_file, maxBytes=(1048576*5), backupCount=3
     # )
     logger_formatter = logging.Formatter(
         '%(asctime)s : %(levelname)s : %(message)s',
@@ -378,29 +359,26 @@ def configuring_logging():
     return logger
 
 
-def send_about_something(message, message_text='', delete_second_message=True):
-    # отправляем информационное сообщение
-    info_message = bot.send_message(message.chat.id, message_text)
-    # и удаляем предыдущее сообщение (message.message_id) и при соблюдении условия - последнее (info_message.message_id)
-    if not delete_second_message:
-        del_bot_mes(message.chat.id, message.message_id, 0)
-        return
-    del_bot_mes(message.chat.id, message.message_id, info_message.message_id)
-    
+def send_about_something(
+        message,
+        message_text='',
+        dalete_previous_message=True,
+        delete_this_message=True,
+        markup=None,
+):
+    """Отправка сообщения и по умолчанию удаление предыдущего и отправленного."""
+    info_message = bot.send_message(message.chat.id, message_text, reply_markup=markup)
+    time.sleep(config.pause)
+    if delete_this_message:
+        bot.delete_message(message.chat.id, info_message.message_id)
+    if dalete_previous_message:
+        bot.delete_message(message.chat.id, message.message_id)
+        
     
 def create_bot_settings_file():
-    # os.mknod('bot_settings.json')
     with open('bot_settings.json', 'w+') as file:
         file.write('{}')
         file.close()
-
-
-# функция удаления команды пользователя и сообщения бота через время = config.pause
-def del_bot_mes(chat_id, mes_id, info_mes_id):
-    time.sleep(config.pause)
-    bot.delete_message(chat_id, mes_id)
-    if info_mes_id:
-        bot.delete_message(chat_id, info_mes_id)
 
 
 def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
@@ -412,11 +390,9 @@ def save_bot_settings(bot_settings):    # сохранение списка на
 
 def main():
     configuring_logging()
-    # logger.info('ЗАПУСТИЛСЯ')
     if not os.path.exists('bot_settings.json'):
         create_bot_settings_file()
     # TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
-    # bot.infinity_polling(allowed_updates=update_types)
     bot.polling(none_stop=True)
 
 
