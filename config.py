@@ -12,7 +12,8 @@ other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker':
                           'venue': 'место встречи', 'animation': 'анимация (gif)'}
 bot_settings = {}
 pause = 2
-command_from_markup = []
+command_from_markup = {}
+last_messages = {}
 
 help = '''Бот антиспам имеет следующие команды:
         /start - запуск/перезапуск бота

@@ -9,7 +9,7 @@ import os
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
-from telebot.util import update_types
+# from telebot.util import update_types
 from datetime import datetime
 
 previous_markup = None
@@ -121,14 +121,14 @@ def callback_inline(call):
             previous_markup = 'menu_markup'
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
-            config.command_from_markup = 'addword'
+            config.command_from_markup[call.message.chat.id] = 'addword'
             bot.register_next_step_handler(last_message, add_word, 'bad')
         
         if call.data == "bad_words_del":
             previous_markup = 'menu_markup'
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
-            config.command_from_markup = 'delword'
+            config.command_from_markup[call.message.chat.id] = 'delword'
             bot.register_next_step_handler(last_message, del_word, 'bad')
 
         if call.data == "finance_words":
@@ -141,14 +141,14 @@ def callback_inline(call):
             previous_markup = 'menu_markup'
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово добавить?")
-            config.command_from_markup = 'addword'
+            config.command_from_markup[call.message.chat.id] = 'addword'
             bot.register_next_step_handler(last_message, add_word, 'finance')
 
         if call.data == "finance_words_del":
             previous_markup = 'menu_markup'
             previous_message = 0
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
-            config.command_from_markup = 'delword'
+            config.command_from_markup[call.message.chat.id] = 'delword'
             bot.register_next_step_handler(last_message, del_word, 'finance')
     
         if call.data in config.other_types_of_message.keys():
@@ -156,13 +156,18 @@ def callback_inline(call):
             previous_message = 0
             if call.data in config.bot_settings[str(call.message.chat.id)]['forbidden_messages']:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].remove(call.data)
-                send_about_something(call.message,
-                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.', False)
+                info_message = bot.send_message(
+                    call.message.chat.id,
+                    f'Cообщения типа "{config.other_types_of_message[call.data]}" разрешены.')
+                del_bot_mes(call.message.chat.id, info_message.message_id, 0)
                 save_bot_settings(config.bot_settings)
             else:
                 config.bot_settings[str(call.message.chat.id)]['forbidden_messages'].append(call.data)
-                send_about_something(call.message,
-                                     f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.', False)
+                info_message = bot.send_message(
+                    call.message.chat.id,
+                    f'Cообщения типа "{config.other_types_of_message[call.data]}" запрещены.',
+                )
+                del_bot_mes(call.message.chat.id, info_message.message_id, 0)
                 save_bot_settings(config.bot_settings)
             forbidden_messages = ", ".join([config.other_types_of_message[type_name] for type_name in
                                             config.bot_settings[str(call.message.chat.id)]["forbidden_messages"]])
@@ -203,7 +208,7 @@ def add_word(message, word_type='bad'):
     try:
         if not checking_for_admin(message):
             return
-        if config.command_from_markup:
+        if config.command_from_markup[message.chat.id]:
             message.text = 'addword ' + message.text
         _, new_word = message.text.split(maxsplit=1)
         new_word = new_word.lower()
@@ -213,9 +218,9 @@ def add_word(message, word_type='bad'):
             add_word_to_file(config.finance_words_file, new_word, config.finance_words)
         else:
             send_about_something(message, f'В базе {word_type.upper()} уже есть слово "{new_word}"')
-        if config.command_from_markup:
+        if config.command_from_markup[message.chat.id]:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
-            config.command_from_markup = None
+            config.command_from_markup[message.chat.id] = None
     except Exception as error:
         logger.error(error)
 
@@ -233,7 +238,7 @@ def del_word(message, word_type='bad'):
     try:
         if not checking_for_admin(message):
             return
-        if config.command_from_markup:
+        if config.command_from_markup[message.chat.id]:
             message.text = 'delword ' + message.text
         _, removing_word = message.text.split(maxsplit=1)
         removing_word = removing_word.lower()
@@ -243,9 +248,9 @@ def del_word(message, word_type='bad'):
             del_word_from_file(config.finance_words_file, removing_word, config.finance_words)
         else:
             send_about_something(message, f'В базе {word_type.upper()} нет слова "{removing_word}"')
-        if config.command_from_markup:
+        if config.command_from_markup[message.chat.id]:
             del_bot_mes(message.chat.id, message.message_id - 1, 0)
-            config.command_from_markup = None
+            config.command_from_markup[message.chat.id] = None
     except Exception as error:
         logger.error(error)
 
@@ -374,7 +379,9 @@ def configuring_logging():
 
 
 def send_about_something(message, message_text='', delete_second_message=True):
+    # отправляем информационное сообщение
     info_message = bot.send_message(message.chat.id, message_text)
+    # и удаляем предыдущее сообщение (message.message_id) и при соблюдении условия - последнее (info_message.message_id)
     if not delete_second_message:
         del_bot_mes(message.chat.id, message.message_id, 0)
         return
@@ -409,7 +416,8 @@ def main():
     if not os.path.exists('bot_settings.json'):
         create_bot_settings_file()
     # TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
-    bot.infinity_polling(allowed_updates=update_types)
+    # bot.infinity_polling(allowed_updates=update_types)
+    bot.polling(none_stop=True)
 
 
 if __name__ == "__main__":
