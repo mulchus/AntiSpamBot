@@ -47,8 +47,8 @@ def checking_for_admin(message):
     except ApiTelegramException:
         send_about_something(message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
         return False
-    admins_id = [admins[i].user.id for i in range(len(admins))]  # список админов
-    if message.from_user.id not in admins_id:  # если команду дал не админ - отлуп
+    admins_ids = [admin.user.id for admin in admins]  # список админов
+    if message.from_user.id not in admins_ids:  # если команду дал не админ - отлуп
         send_about_something(message, 'У вас недостаточно прав для этой команды.')
         return False
     return admins
@@ -102,6 +102,8 @@ def menu(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
+    if not checking_for_admin(call.message):
+        return
     try:
         if call.data == "menu":
             send_about_something(call.message, "Настройки бота", True, False, m.menu_markup)
@@ -287,10 +289,13 @@ def pause(message):
     except ValueError:
         send_about_something(message, 'Неверно введена команда. Проверьте формат через /help')
         return
-    if sec.isdigit() and (0 < int(sec) <= 5):
-        config.pause = int(sec)
-        send_about_something(message, f'Пауза отображения сообщения бота теперь = {sec} секунд')
-    else:
+    try:
+        if 0 < float(sec) <= 5:
+            config.pause = float(sec)
+            send_about_something(message, f'Пауза отображения сообщения бота теперь = {sec} секунд')
+        else:
+            send_about_something(message, 'Значение должно быть числом от 0.1 до 5')
+    except ValueError:
         send_about_something(message, 'Значение должно быть числом от 0.1 до 5')
 
 
