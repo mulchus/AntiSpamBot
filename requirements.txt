@@ -7,4 +7,5 @@ packaging==24.0
 pyTelegramBotAPI==4.16.1
 python-dotenv==1.0.1
 requests==2.31.0
+schedule==1.2.1
 urllib3==2.2.1

@@ -6,10 +6,12 @@ import config
 import logging
 import logging.handlers
 import os
+import schedule
+from threading import Thread
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 logger = logging.getLogger()
@@ -18,6 +20,26 @@ env.read_env()
 bot_token = env('BOT_TOKEN')
 bot = telebot.TeleBot(bot_token)
 
+
+def delete_old_users():
+    if not config.bot_settings:
+        return
+    for chat_id, chat_config in config.bot_settings.items():
+        # удаляем юзеров, которые больше config.seconds_to_user_be_old секунд назад добавленны в чат
+        for user_id, user_config in chat_config['controlled_users'].copy().items():
+            if (datetime.strptime(user_config['addition time'], "%d-%m-%Y %H:%M:%S")
+                    < datetime.now() - timedelta(seconds=config.seconds_to_user_be_old)):
+                logger.info(f'Удаляем юзера {user_id} из чата {chat_id}.')
+                config.bot_settings[chat_id]['controlled_users'].pop(user_id)
+    save_bot_settings(config.bot_settings)
+    
+
+def starting_tasks():
+    schedule.every(config.control_period).seconds.do(delete_old_users)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+        
 
 def checking_for_admin(message):
     try:
@@ -38,7 +60,7 @@ def start(message):
     if not checking_for_admin(message):
         return
     bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    with open('bot_settings.json', 'r+') as file:
+    with open('bot_settings.json', 'r') as file:
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
         logger.info('Я знаю этот чат!')
@@ -373,25 +395,20 @@ def send_about_something(
         bot.delete_message(message.chat.id, info_message.message_id)
     if dalete_previous_message:
         bot.delete_message(message.chat.id, message.message_id)
-        
-    
-def create_bot_settings_file():
-    with open('bot_settings.json', 'w+') as file:
-        file.write('{}')
-        file.close()
 
 
 def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
-    f = open('bot_settings.json', 'w+')
-    f.seek(0)
-    f.write(json.dumps(bot_settings))
-    f.close()
+    with open('bot_settings.json', 'w+') as file:
+        file.write(json.dumps(bot_settings))
+        file.close()
 
 
 def main():
+    thread = Thread(target=starting_tasks)
+    thread.start()
     configuring_logging()
     if not os.path.exists('bot_settings.json'):
-        create_bot_settings_file()
+        save_bot_settings(config.bot_settings)
     # TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
     bot.polling(none_stop=True)
 
