@@ -43,6 +43,7 @@ def starting_tasks():
 
 def checking_for_admin(message):
     try:
+        # TODO  AttributeError: 'CallbackQuery' object has no attribute 'chat' if i send only CALL
         admins = bot.get_chat_administrators(message.chat.id)
     except ApiTelegramException:
         send_about_something(message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
@@ -102,7 +103,11 @@ def menu(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    if not checking_for_admin(call.message):
+    print(call.message)
+    print(call.from_user.id)
+    # TODO здесь почему то всегда показывает что кнопку нажал админ!!!
+    print(call.message.from_user.id, call.message.chat.id)
+    if not checking_for_admin(call):
         return
     try:
         if call.data == "menu":
