@@ -39,18 +39,25 @@ def starting_tasks():
     while True:
         schedule.run_pending()
         time.sleep(60)
-        
 
-def checking_for_admin(message):
+
+def checking_for_admin(call_or_message, inline=False):
     try:
-        # TODO  AttributeError: 'CallbackQuery' object has no attribute 'chat' if i send only CALL
-        admins = bot.get_chat_administrators(message.chat.id)
+        # из-за передачи сюда иногда call.message, иногда call требуется дополнительная проверка
+        if inline:
+            admins = bot.get_chat_administrators(call_or_message.message.chat.id)
+        else:
+            admins = bot.get_chat_administrators(call_or_message.chat.id)
     except ApiTelegramException:
-        send_about_something(message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
+        send_about_something(call_or_message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
         return False
     admins_ids = [admin.user.id for admin in admins]  # список админов
-    if message.from_user.id not in admins_ids:  # если команду дал не админ - отлуп
-        send_about_something(message, 'У вас недостаточно прав для этой команды.')
+    if call_or_message.from_user.id not in admins_ids:  # если команду дал не админ - отлуп
+        message_text = 'У вас недостаточно прав для этой команды.'
+        if inline:
+            send_about_something(call_or_message.message, message_text, False)
+        else:
+            send_about_something(call_or_message, message_text)
         return False
     return admins
 
@@ -103,11 +110,12 @@ def menu(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    print(call.message)
+    print(call)
     print(call.from_user.id)
+    print(call.message)
     # TODO здесь почему то всегда показывает что кнопку нажал админ!!!
     print(call.message.from_user.id, call.message.chat.id)
-    if not checking_for_admin(call):
+    if not checking_for_admin(call, True):
         return
     try:
         if call.data == "menu":
