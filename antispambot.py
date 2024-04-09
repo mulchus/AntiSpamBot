@@ -29,7 +29,7 @@ def delete_old_users():
         for user_id, user_config in chat_config['controlled_users'].copy().items():
             if (datetime.strptime(user_config['addition time'], "%d-%m-%Y %H:%M:%S")
                     < datetime.now() - timedelta(seconds=config.seconds_to_user_be_old)):
-                logger.info(f'Удаляем юзера {user_id} из чата {chat_id}.')
+                logger.info(f'Удаляем контроль юзера {user_id} из чата {chat_id}.')
                 config.bot_settings[chat_id]['controlled_users'].pop(user_id)
     save_bot_settings(config.bot_settings)
     
@@ -55,15 +55,14 @@ def checking_for_admin(user_id, chat_id):
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
-    rezult, message = checking_for_admin(message.from_user.id, message.chat.id)
-    if not rezult:
-
+    result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+    if not result:
+        send_about_something(message, message_text)
         return
     bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('bot_settings.json', 'r') as file:
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
-        logger.info('Я знаю этот чат!')
         config.bot_settings[str(message.chat.id)]['previous_markup'] = None
         config.bot_settings[str(message.chat.id)]['previous_message'] = None
         save_bot_settings(config.bot_settings)
@@ -87,12 +86,15 @@ def start(message):
             file.close()
         send_about_something(message, 'Словарь финансовых понятий загружен', False)
     send_about_something(message, 'Шеф. я запустился. Все ок!')
+    logger.info(f'Запуск в чате {message.chat.id}.')
 
 
 # вызов меню:
 @bot.message_handler(commands=['menu'])
 def menu(message):
-    if not checking_for_admin(message):
+    result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+    if not result:
+        send_about_something(message, message_text)
         return
     if config.mat:  # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
         bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
@@ -102,12 +104,9 @@ def menu(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    print(call)
-    print(call.from_user.id)
-    print(call.message)
-    # TODO здесь почему то всегда показывает что кнопку нажал админ!!!
-    print(call.message.from_user.id, call.message.chat.id)
-    if not checking_for_admin(call, True):
+    result, message_text = checking_for_admin(call.from_user.id, call.message.chat.id)
+    if not result:
+        send_about_something(call.message, message_text)
         return
     try:
         if call.data == "menu":
@@ -213,7 +212,9 @@ def add_word(message, word_type='bad'):
             send_about_something(message, f'В базу {word_type.upper()} добавлено слово "{word}"')
             return
     try:
-        if not checking_for_admin(message):
+        result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+        if not result:
+            send_about_something(message, message_text)
             return
         if config.command_from_markup[message.chat.id]:
             message.text = 'addword ' + message.text
@@ -244,7 +245,9 @@ def del_word(message, word_type='bad'):
             send_about_something(message, f'Из базы {word_type.upper()} удалено слово "{word}"')
             return
     try:
-        if not checking_for_admin(message):
+        result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+        if not result:
+            send_about_something(message, message_text)
             return
         if config.command_from_markup[message.chat.id]:
             message.text = 'delword ' + message.text
@@ -267,8 +270,9 @@ def del_word(message, word_type='bad'):
 # вывод сообщений, возможных к обработке
 @bot.message_handler(commands=['show'])
 def show(message):
-    admins = checking_for_admin(message)
-    if not admins:
+    result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+    if not result:
+        send_about_something(message, message_text)
         return
     try:
         _, object_ = message.text.split(maxsplit=1)
@@ -279,7 +283,7 @@ def show(message):
     if object_ == 'admins':  # если команда "/show admins", то вывод админов:
         list_admins = [
             f'Админ {num+1}: @{admin.user.username}{", бот" if admin.user.is_bot else ""}\n'
-            for num, admin in enumerate(admins)
+            for num, admin in enumerate(result)
         ]
         send_about_something(
             message, ''.join(list_admins) + f'\nВсего админов: {len(list_admins)}')
@@ -287,7 +291,9 @@ def show(message):
 
 @bot.message_handler(commands=['pause'])
 def pause(message):
-    if not checking_for_admin(message):
+    result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+    if not result:
+        send_about_something(message, message_text)
         return
     try:
         _, sec = message.text.split(maxsplit=1)
@@ -312,14 +318,12 @@ def help_(message):
 # проверка поступившего сообщения на плохие слова
 @bot.message_handler(content_types=['text'])
 def check_for_bad_text(message):
-    logger.info(message.from_user.id)
-    logger.info(message.text)
     message_words = set([word.lower() for word in message.text.split(' ')])
     if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
             len(message_words.intersection(config.finance_words)) > 0):
-        logger.info(f'Впойман криптоман {message.from_user.username}, удаляем!!!')
-        send_about_something(
-            message, f'Впойман криптоман {message.from_user.username}, удаляем!!!')
+        message_text = f'Впойман криптоман {message.from_user.username} {message.from_user.id}, удаляем!!!'
+        logger.info(message_text)
+        send_about_something(message, message_text)
         bot.kick_chat_member(message.chat.id, message.from_user.id)
         return
     try:
@@ -339,7 +343,8 @@ def check_for_bad_text(message):
 @bot.message_handler(content_types=config.other_types_of_message)
 def check_for_bad_message(message):
     try:
-        if message.content_type in config.bot_settings[str(message.chat.id)]['forbidden_messages']:
+        if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
+                message.content_type in config.bot_settings[str(message.chat.id)]['forbidden_messages']):
             send_about_something(
                 message,
                 f'Размещение формата {config.other_types_of_message[message.content_type]} запрещено! Удаляю!')
@@ -351,13 +356,13 @@ def check_for_bad_message(message):
 def check_member_login(updated):
     try:
         if updated.new_chat_member.status == 'member':
+            message_text = (f'знаю этого юзера {updated.new_chat_member.user.username} '
+                            f'{updated.new_chat_member.user.id}!')
             if (str(updated.new_chat_member.user.id) in
                     config.bot_settings[str(updated.chat.id)]['controlled_users'].keys()):
-                logger.info(
-                    f'Я знаю этого юзера {updated.new_chat_member.user.username} {updated.new_chat_member.user.id}!')
+                logger.info('Я ' + message_text)
             else:
-                logger.info(f'Я не знаю этого юзера {updated.new_chat_member.user.username}'
-                            f' {updated.new_chat_member.user.id}. Добавил.')
+                logger.info(f'Я не ' + message_text + ' Добавил.')
                 config.bot_settings[str(updated.chat.id)]['controlled_users'][str(updated.new_chat_member.user.id)] = \
                     {'addition time': datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
                 save_bot_settings(config.bot_settings)
@@ -378,10 +383,10 @@ def check_member_login(updated):
 
 def configuring_logging():
     logger.setLevel(logging.INFO)
-    logger_handler = logging.StreamHandler()
-    # logger_handler = logging.handlers.RotatingFileHandler(
-    #     config.log_file, maxBytes=(1048576*5), backupCount=3
-    # )
+    # logger_handler = logging.StreamHandler()
+    logger_handler = logging.handlers.RotatingFileHandler(
+        config.log_file, maxBytes=(1048576*5), backupCount=3
+    )
     logger_formatter = logging.Formatter(
         '%(asctime)s : %(levelname)s : %(message)s',
         datefmt='%d-%m-%Y %H:%M:%S'
