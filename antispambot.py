@@ -41,31 +41,23 @@ def starting_tasks():
         time.sleep(60)
 
 
-def checking_for_admin(call_or_message, inline=False):
+def checking_for_admin(user_id, chat_id):
     try:
-        # из-за передачи сюда иногда call.message, иногда call требуется дополнительная проверка
-        if inline:
-            admins = bot.get_chat_administrators(call_or_message.message.chat.id)
-        else:
-            admins = bot.get_chat_administrators(call_or_message.chat.id)
+        admins = bot.get_chat_administrators(chat_id)
     except ApiTelegramException:
-        send_about_something(call_or_message, 'Команда доступна только в группе. В приватном чате нет администраторов.')
-        return False
+        return False, 'Команда доступна только в группе. В приватном чате нет администраторов.'
     admins_ids = [admin.user.id for admin in admins]  # список админов
-    if call_or_message.from_user.id not in admins_ids:  # если команду дал не админ - отлуп
-        message_text = 'У вас недостаточно прав для этой команды.'
-        if inline:
-            send_about_something(call_or_message.message, message_text, False)
-        else:
-            send_about_something(call_or_message, message_text)
-        return False
-    return admins
+    if user_id not in admins_ids:  # если команду дал не админ - отлуп
+        return False, 'У вас недостаточно прав для этой команды.'
+    return admins, 'Ок.'
 
 
 # запуск бота для инициализации стартовых процессов:
 @bot.message_handler(commands=['start'])
 def start(message):
-    if not checking_for_admin(message):
+    rezult, message = checking_for_admin(message.from_user.id, message.chat.id)
+    if not rezult:
+
         return
     bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open('bot_settings.json', 'r') as file:
