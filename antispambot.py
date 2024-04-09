@@ -389,7 +389,7 @@ def configuring_logging():
     logger.setLevel(logging.INFO)
     # logger_handler = logging.StreamHandler()
     logger_handler = logging.handlers.RotatingFileHandler(
-        config.log_file, maxBytes=(1048576*5), backupCount=3
+        Path.joinpath(BASE_DIR, config.log_file), maxBytes=(1048576*5), backupCount=3
     )
     logger_formatter = logging.Formatter(
         '%(asctime)s : %(levelname)s : %(message)s',
