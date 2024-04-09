@@ -8,6 +8,7 @@ import logging.handlers
 import os
 import schedule
 from threading import Thread
+from pathlib import Path
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
@@ -19,6 +20,7 @@ env = Env()
 env.read_env()
 bot_token = env('BOT_TOKEN')
 bot = telebot.TeleBot(bot_token)
+BASE_DIR = Path(__file__).resolve().parent
 
 
 def delete_old_users():
@@ -60,7 +62,7 @@ def start(message):
         send_about_something(message, message_text)
         return
     bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
-    with open('./bot_settings.json', 'r') as file:
+    with open(Path.joinpath(BASE_DIR, 'bot_settings.json'), 'r') as file:
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
         config.bot_settings[str(message.chat.id)]['previous_markup'] = None
@@ -76,12 +78,14 @@ def start(message):
         config.bot_settings[str(message.chat.id)] = chat_settings
         save_bot_settings(config.bot_settings)
     if not config.mat:  # если словарь мата еще пустой
-        with open(f'./{config.mat_file}', encoding='utf-8') as file:  # создание списка плохих слов из файла txt
+        with open(Path.joinpath(BASE_DIR, config.mat_file), encoding='utf-8') as file:
+            # создание списка плохих слов из файла txt
             config.mat = file.read().split(', ')
             file.close()
         send_about_something(message, 'Словарь мата загружен', False)
     if not config.finance_words:  # если словарь финансовых понятий еще пустой
-        with open(f'./{config.finance_words_file}', encoding='utf-8') as file:  # создание списка финансовых понятий из файла txt
+        with open(Path.joinpath(BASE_DIR, config.finance_words_file), encoding='utf-8') as file:
+            # создание списка финансовых понятий из файла txt
             config.finance_words = file.read().split(', ')
             file.close()
         send_about_something(message, 'Словарь финансовых понятий загружен', False)
@@ -205,7 +209,7 @@ def callback_inline(call):
 @bot.message_handler(commands=['addword'])
 def add_word(message, word_type='bad'):
     def add_word_to_file(file_name, word, data_list_name):
-        with open(f'./{file_name}', 'a', encoding='utf-8') as file:
+        with open(Path.joinpath(BASE_DIR, file_name), 'a', encoding='utf-8') as file:
             file.write(', ' + word)
             file.close()
             data_list_name.append(word)
@@ -238,7 +242,7 @@ def add_word(message, word_type='bad'):
 @bot.message_handler(commands=['delword'])
 def del_word(message, word_type='bad'):
     def del_word_from_file(file_name, word, data_list_name):
-        with open(f'./{file_name}', 'w', encoding='utf-8') as file:
+        with open(Path.joinpath(BASE_DIR, file_name), 'w', encoding='utf-8') as file:
             data_list_name.remove(word)
             file.write(', '.join(data_list_name))
             file.close()
@@ -413,7 +417,7 @@ def send_about_something(
 
 
 def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
-    with open('./bot_settings.json', 'w+') as file:
+    with open(Path.joinpath(BASE_DIR, 'bot_settings.json'), 'w+') as file:
         file.write(json.dumps(bot_settings))
         file.close()
 
