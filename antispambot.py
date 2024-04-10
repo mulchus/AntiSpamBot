@@ -62,7 +62,7 @@ def start(message):
     if not result:
         send_about_something(message, message_text)
         return
-    bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+    # bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open(Path.joinpath(BASE_DIR, 'bot_settings.json'), 'r') as file:
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
@@ -103,6 +103,7 @@ def menu(message):
         return
     if config.mat:  # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
         bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+        bot.delete_message(message.chat.id, message.message_id)
     else:
         send_about_something(message, 'Для начаоа работы жми /start')
 
@@ -115,8 +116,8 @@ def callback_inline(call):
         return
     try:
         if call.data == "menu":
-            send_about_something(call.message, "Настройки бота", True, False, m.menu_markup)
             config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+            send_about_something(call.message, "Настройки бота", True, False, m.menu_markup)
     
         if call.data == "help":
             config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
