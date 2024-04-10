@@ -9,6 +9,7 @@ import os
 import schedule
 from threading import Thread
 from pathlib import Path
+from requests.exceptions import ConnectionError
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
@@ -428,8 +429,16 @@ def main():
     configuring_logging()
     if not os.path.exists('bot_settings.json'):
         save_bot_settings(config.bot_settings)
-    # TODO переместить сюда или под IF __name__ переменные окружения и инстал бота
-    bot.polling(none_stop=True)
+
+    while True:
+        try:
+            bot.polling(none_stop=True)
+        except ConnectionError as error:
+            logger.error(f'Потеря или ошибка соединения. {error}')
+            time.sleep(15)
+        except Exception as err:
+            logger.error('Бот упал c неизвестной ошибкой:')
+            logger.exception(err)
 
 
 if __name__ == "__main__":
