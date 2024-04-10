@@ -1,11 +1,11 @@
 from telebot import types
 from config import other_types_of_message
 
-start_markup = types.InlineKeyboardMarkup(row_width=2)
-start_markup_btn1 = types.InlineKeyboardButton('Меню', callback_data='menu')
-start_markup_btn2 = types.InlineKeyboardButton('HELP', callback_data='help')
-start_markup_exit = types.InlineKeyboardButton('Выход', callback_data='exit')
-start_markup.add(start_markup_btn1, start_markup_btn2, start_markup_exit)
+# start_markup = types.InlineKeyboardMarkup(row_width=2)
+# start_markup_btn1 = types.InlineKeyboardButton('Меню', callback_data='menu')
+# start_markup_btn2 = types.InlineKeyboardButton('HELP', callback_data='help')
+# start_markup_exit = types.InlineKeyboardButton('Выход', callback_data='exit')
+# start_markup.add(start_markup_btn1, start_markup_btn2, start_markup_exit)
 
 exit_markup = types.InlineKeyboardMarkup(row_width=1)
 exit_markup_btn = types.InlineKeyboardButton('Назад', callback_data='exit')
@@ -15,8 +15,14 @@ menu_markup = types.InlineKeyboardMarkup(row_width=2)
 menu_markup_fb = types.InlineKeyboardButton('Запрещенные сообщения', callback_data='forbidden_messages')
 menu_markup_bw = types.InlineKeyboardButton('Плохие слова', callback_data='bad_words')
 menu_markup_fw = types.InlineKeyboardButton('Финансовые слова', callback_data='finance_words')
-menu_markup_exit = types.InlineKeyboardButton('Назад', callback_data='exit')
-menu_markup.add(menu_markup_fb, menu_markup_bw, menu_markup_fw, menu_markup_exit)
+menu_markup_analysis = types.InlineKeyboardButton('Анализ текста', callback_data='analysis')
+menu_markup_help = types.InlineKeyboardButton('HELP', callback_data='help')
+menu_markup_exit = types.InlineKeyboardButton('Выход', callback_data='exit')
+menu_markup.row(menu_markup_fb)
+menu_markup.row(menu_markup_bw, menu_markup_fw)
+menu_markup.row(menu_markup_analysis, menu_markup_help)
+menu_markup.row(menu_markup_exit)
+
 
 forbidden_message_markup = types.InlineKeyboardMarkup(row_width=2)
 buttons = [types.InlineKeyboardButton(other_types_of_message[mes_type], callback_data=mes_type)

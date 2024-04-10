@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 import os
 import schedule
+
 from threading import Thread
 from pathlib import Path
 from requests.exceptions import ConnectionError
@@ -90,6 +91,9 @@ def start(message):
             config.finance_words = file.read().split(', ')
             file.close()
         send_about_something(message, 'Словарь финансовых понятий загружен', False)
+    if not config.stop_words:  # если словарь стоп-слов еще пустой
+        with open(Path.joinpath(BASE_DIR, 'stopwords.txt'), 'r', encoding='utf-8') as file:
+            config.stop_words = file.read().splitlines()
     send_about_something(message, 'Шеф. я запустился. Все ок!')
     logger.info(f'Запуск в чате {message.chat.id}.')
 
@@ -102,7 +106,7 @@ def menu(message):
         send_about_something(message, message_text)
         return
     if config.mat:  # если словарь мата не пустой (признак, что бот ранее стартовал нормально)
-        bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
+        bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.menu_markup)
         bot.delete_message(message.chat.id, message.message_id)
     else:
         send_about_something(message, 'Для начаоа работы жми /start')
@@ -116,11 +120,11 @@ def callback_inline(call):
         return
     try:
         if call.data == "menu":
-            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = ''
             send_about_something(call.message, "Настройки бота", True, False, m.menu_markup)
     
         if call.data == "help":
-            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             send_about_something(call.message, f'Помощь\n{config.help}', True, False, m.exit_markup)
     
         if call.data == "forbidden_messages":
@@ -162,6 +166,13 @@ def callback_inline(call):
             last_message = bot.send_message(call.message.chat.id, "Какое слово удалить?")
             config.command_from_markup[call.message.chat.id] = 'delword'
             bot.register_next_step_handler(last_message, del_word, 'finance')
+        
+        if call.data == "analysis":
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = ''
+            last_message = bot.send_message(
+                call.message.chat.id, "Введите или перешлите сообщение для анализа на криптоматику.")
+            config.command_from_markup[call.message.chat.id] = 'analysis'
+            bot.register_next_step_handler(last_message, analysis_text_to_crypto)
     
         if call.data in config.other_types_of_message.keys():
             config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
@@ -185,13 +196,13 @@ def callback_inline(call):
                                config.bot_settings[str(call.message.chat.id)]['previous_message']-2)
 
         if call.data == "exit":
-            if config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'start_markup':
+            if config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'menu_markup':
                 bot.send_message(call.message.chat.id, f"Меню в чате № {call.message.chat.id}!",
-                                 reply_markup=m.start_markup)
+                                 reply_markup=m.menu_markup)
                 config.bot_settings[str(call.message.chat.id)]['previous_markup'] = None
             elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'menu_markup':
                 bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
-                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'start_markup'
+                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
             elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'forbidden_message_markup':
                 bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
                 config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
@@ -203,6 +214,24 @@ def callback_inline(call):
                 bot.delete_message(call.message.chat.id,
                                    config.bot_settings[str(call.message.chat.id)]['previous_message'])
                 config.bot_settings[str(call.message.chat.id)]['previous_message'] = None
+    except Exception as error:
+        logger.error(error)
+
+
+@bot.message_handler(commands=['analysis'])
+def analysis_text_to_crypto(message):
+    try:
+        result, message_text = checking_for_admin(message.from_user.id, message.chat.id)
+        if not result:
+            send_about_something(message, message_text)
+            return
+        words = set([get_supword(word.lower()) for word in message.text.split()
+                     if word.lower() not in config.stop_words])
+        possible_words = [word for word in words if word not in config.finance_words]
+        send_about_something(message, f'Возможные слова: {", ".join(possible_words)}', True, False)
+        if config.command_from_markup[message.chat.id]:
+            bot.delete_message(message.chat.id, message.message_id - 1)
+            config.command_from_markup[message.chat.id] = None
     except Exception as error:
         logger.error(error)
 
@@ -335,7 +364,7 @@ def check_for_bad_text(message):
     try:
         mats_words = []
         for word in message.text.split(' '):
-            supword = (''.join(c for c in word if c not in config.black_simvols)).lower()
+            supword = get_supword(word)
             if supword in config.mat:   # проверяем на мат
                 mats_words.append(word)
         if len(mats_words) > 0:
@@ -423,6 +452,10 @@ def save_bot_settings(bot_settings):    # сохранение списка на
         file.write(json.dumps(bot_settings))
         file.close()
 
+
+def get_supword(word):
+    return (''.join(c for c in word if c not in config.black_simvols)).lower()
+    
 
 def main():
     thread = Thread(target=starting_tasks)

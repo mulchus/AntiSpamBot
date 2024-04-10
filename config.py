@@ -5,6 +5,7 @@ user = ''
 mat = []
 log_file = 'logs.txt'
 mat_file = 'wordfilter.txt'
+stop_words = []
 finance_words = []
 finance_words_file = 'finance_words.txt'
 other_types_of_message = {'audio': 'аудио', 'photo': 'фото', 'sticker': 'стикер', 'video': 'видео',
