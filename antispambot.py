@@ -63,7 +63,6 @@ def start(message):
     if not result:
         send_about_something(message, message_text)
         return
-    # bot.send_message(message.chat.id, f"Меню в чате № {message.chat.id}!", reply_markup=m.start_markup)
     with open(Path.joinpath(BASE_DIR, 'bot_settings.json'), 'r') as file:
         config.bot_settings = json.load(file)
     if str(message.chat.id) in config.bot_settings.keys():
@@ -168,10 +167,10 @@ def callback_inline(call):
             bot.register_next_step_handler(last_message, del_word, 'finance')
         
         if call.data == "analysis":
-            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = ''
-            last_message = bot.send_message(
-                call.message.chat.id, "Введите или перешлите сообщение для анализа на криптоматику.")
-            config.command_from_markup[call.message.chat.id] = 'analysis'
+            config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+            last_message = send_about_something(
+                call.message, "Введите или перешлите сообщение для анализа на криптоматику.",
+                True, False, m.exit_markup)
             bot.register_next_step_handler(last_message, analysis_text_to_crypto)
     
         if call.data in config.other_types_of_message.keys():
@@ -197,19 +196,16 @@ def callback_inline(call):
 
         if call.data == "exit":
             if config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'menu_markup':
-                bot.send_message(call.message.chat.id, f"Меню в чате № {call.message.chat.id}!",
-                                 reply_markup=m.menu_markup)
                 config.bot_settings[str(call.message.chat.id)]['previous_markup'] = None
-            elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'menu_markup':
-                bot.send_message(call.message.chat.id, "Настройки бота", reply_markup=m.menu_markup)
-                config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+                send_about_something(call.message, f"Меню в чате № {call.message.chat.id}!",
+                                     True, False, m.menu_markup)
             elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'forbidden_message_markup':
-                bot.send_message(call.message.chat.id, "Запрещенные сообщения", reply_markup=m.forbidden_message_markup)
                 config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
+                send_about_something(call.message, "Запрещенные сообщения",
+                                     True, False, m.forbidden_message_markup)
             elif config.bot_settings[str(call.message.chat.id)]['previous_markup'] == 'bad_words':
-                bot.send_message(call.message.chat.id, "Плохие слова", reply_markup=m.bad_words_markup)
                 config.bot_settings[str(call.message.chat.id)]['previous_markup'] = 'menu_markup'
-            bot.delete_message(call.message.chat.id, call.message.message_id)
+                send_about_something(call.message, "Плохие слова", True, False, m.bad_words_markup)
             if config.bot_settings[str(call.message.chat.id)]['previous_message']:
                 bot.delete_message(call.message.chat.id,
                                    config.bot_settings[str(call.message.chat.id)]['previous_message'])
@@ -445,6 +441,7 @@ def send_about_something(
         bot.delete_message(message.chat.id, info_message.message_id)
     if dalete_previous_message:
         bot.delete_message(message.chat.id, message.message_id)
+    return info_message
 
 
 def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
