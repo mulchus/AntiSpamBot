@@ -16,7 +16,7 @@ menu_markup_fb = types.InlineKeyboardButton('Запрещенные сообще
 menu_markup_bw = types.InlineKeyboardButton('Плохие слова', callback_data='bad_words')
 menu_markup_fw = types.InlineKeyboardButton('Финансовые слова', callback_data='finance_words')
 menu_markup_analysis = types.InlineKeyboardButton('Анализ текста', callback_data='analysis')
-menu_markup_help = types.InlineKeyboardButton('HELP', callback_data='help')
+menu_markup_help = types.InlineKeyboardButton('Помощь', callback_data='help')
 menu_markup_exit = types.InlineKeyboardButton('Выход', callback_data='exit')
 menu_markup.row(menu_markup_fb)
 menu_markup.row(menu_markup_bw, menu_markup_fw)
