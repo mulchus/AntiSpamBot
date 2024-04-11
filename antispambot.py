@@ -45,7 +45,7 @@ def starting_tasks():
         time.sleep(60)
 
 
-def checking_for_admin(user_id, chat_id):
+def checking_for_admin(user_id: int, chat_id: int):
     try:
         admins = bot.get_chat_administrators(chat_id)
     except ApiTelegramException:
@@ -428,11 +428,11 @@ def configuring_logging():
 
 
 def send_about_something(
-        message,
-        message_text='',
-        dalete_previous_message=True,
-        delete_this_message=True,
-        markup=None,
+        message: telebot.types.Message,
+        message_text: str = '',
+        dalete_previous_message: bool = True,
+        delete_this_message: bool = True,
+        markup: telebot.types.InlineKeyboardMarkup = None,
 ):
     """Отправка сообщения и по умолчанию удаление предыдущего и отправленного."""
     info_message = bot.send_message(message.chat.id, message_text, reply_markup=markup)
@@ -444,13 +444,13 @@ def send_about_something(
     return info_message
 
 
-def save_bot_settings(bot_settings):    # сохранение списка настроек разных чатов в файл
+def save_bot_settings(bot_settings: dict):    # сохранение списка настроек разных чатов в файл
     with open(Path.joinpath(BASE_DIR, 'bot_settings.json'), 'w+') as file:
         file.write(json.dumps(bot_settings))
         file.close()
 
 
-def get_supword(word):
+def get_supword(word: str) -> str:
     return (''.join(c for c in word if c not in config.black_simvols)).lower()
     
 
