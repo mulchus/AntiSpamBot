@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 import os
 import schedule
+import string
 
 from threading import Thread
 from pathlib import Path
@@ -14,6 +15,7 @@ from requests.exceptions import ConnectionError
 
 from environs import Env
 from telebot.apihelper import ApiTelegramException
+from telebot.util import update_types
 from datetime import datetime, timedelta
 
 
@@ -351,12 +353,15 @@ def help_(message):
 def check_for_bad_text(message):
     message_words = set([word.lower() for word in message.text.split(' ')])
     if (str(message.from_user.id) in config.bot_settings[str(message.chat.id)]['controlled_users'].keys() and
-            len(message_words.intersection(config.finance_words)) > 0):
+            (len(message_words.intersection(config.finance_words)) > 0 or
+                (0 < len([char for char in message.text.lower() if char in list(string.ascii_lowercase)]) /
+             len(message.text) < 0.35))):
         message_text = f'Впойман криптоман {message.from_user.username} {message.from_user.id}, удаляем!!!'
         logger.info(message_text)
         send_about_something(message, message_text)
         bot.kick_chat_member(message.chat.id, message.from_user.id)
         return
+    
     try:
         mats_words = []
         for word in message.text.split(' '):
@@ -382,7 +387,7 @@ def check_for_bad_message(message):
     except Exception as error:
         logger.error(error)
     
-    
+
 @bot.chat_member_handler()
 def check_member_login(updated):
     try:
@@ -463,7 +468,7 @@ def main():
 
     while True:
         try:
-            bot.polling(none_stop=True)
+            bot.polling(allowed_updates=update_types, none_stop=True)
         except ConnectionError as error:
             logger.error(f'Потеря или ошибка соединения. {error}')
             time.sleep(15)
