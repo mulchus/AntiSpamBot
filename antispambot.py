@@ -391,15 +391,20 @@ def check_for_bad_message(message):
 @bot.chat_member_handler()
 def check_member_login(updated):
     try:
+        user = updated.new_chat_member.user
         if updated.new_chat_member.status == 'member':
-            message_text = (f'знаю этого юзера {updated.new_chat_member.user.username} '
-                            f'{updated.new_chat_member.user.id}!')
-            if (str(updated.new_chat_member.user.id) in
+            message_text = (f'знаю этого юзера '
+                            f'{user.id}'
+                            f'{(", " + user.username) if user.username else ""}'                            
+                            f'{(", " + user.first_name) if user.first_name else ""}'
+                            f'{(", " + user.last_name) if user.last_name else ""}'
+                            f'{", бот" if user.is_bot else ", не бот"}.')
+            if (str(user.id) in
                     config.bot_settings[str(updated.chat.id)]['controlled_users'].keys()):
                 logger.info('Я ' + message_text)
             else:
                 logger.info(f'Я не ' + message_text + ' Добавил.')
-                config.bot_settings[str(updated.chat.id)]['controlled_users'][str(updated.new_chat_member.user.id)] = \
+                config.bot_settings[str(updated.chat.id)]['controlled_users'][str(user.id)] = \
                     {'addition time': datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
                 save_bot_settings(config.bot_settings)
     except Exception as error:
